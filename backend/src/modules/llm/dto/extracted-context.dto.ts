@@ -28,7 +28,7 @@ export class ExtractedContextDto {
     @Expose()
     @IsOptional()
     @IsString()
-    projectName: string | null;
+    projectName?: string | null;
 
     @Expose()
     @IsString()
