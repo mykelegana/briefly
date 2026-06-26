@@ -1,0 +1,169 @@
+* {
+    box-sizing: border-box;
+    font-family: Inter, Arial, sans-serif;
+}
+
+
+body {
+    margin: 0;
+    height: 100vh;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    background: #0f172a;
+}
+
+
+
+.app {
+    width: 700px;
+    height: 90vh;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+
+    background: #020617;
+
+    border-radius: 18px;
+}
+
+
+
+header {
+    padding: 20px;
+
+    border-bottom: 1px solid #1e293b;
+}
+
+
+
+header h1 {
+    margin: 0;
+
+    color: white;
+}
+
+
+
+header p {
+    color: #94a3b8;
+}
+
+
+
+
+#chat {
+
+    flex: 1;
+
+    padding: 20px;
+
+    overflow-y: auto;
+
+}
+
+
+
+
+.message {
+
+    max-width: 75%;
+
+    margin-bottom: 15px;
+
+    padding: 14px;
+
+    color: white;
+
+    line-height: 1.5;
+
+    border-radius: 15px;
+
+}
+
+
+
+.user {
+
+    margin-left: auto;
+
+    background: #2563eb;
+
+}
+
+
+
+.ai {
+
+    background: #1e293b;
+
+}
+
+
+
+
+form {
+
+    display: flex;
+
+    gap: 10px;
+
+    padding: 15px;
+
+    border-top: 1px solid #1e293b;
+
+}
+
+
+
+
+textarea {
+
+    flex: 1;
+
+    height: 55px;
+
+    padding: 15px;
+
+    resize: none;
+
+    color: white;
+
+    background: #111827;
+
+    border: none;
+
+    border-radius: 12px;
+
+}
+
+
+
+
+button {
+
+    width: 100px;
+
+    color: white;
+
+    background: #2563eb;
+
+    border: none;
+
+    border-radius: 12px;
+
+    cursor: pointer;
+
+}
+
+
+
+button:hover {
+
+    background: #1d4ed8;
+
+}
