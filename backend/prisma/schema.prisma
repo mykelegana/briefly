@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,10 +6,21 @@ datasource db {
   provider = "postgresql"
 }
 
+model AnonymousUser {
+  id       String    @id @default(uuid())
+  sessions Session[]
+
+  @@map("anonymoususer")
+}
+
 model Session {
-  id  Int  @id@default(autoincrement())
-  rawInput  String
-  context Json
-  handoff String
-  createdAt DateTime  @default(now())
+  id              Int           @id @default(autoincrement())
+  user            AnonymousUser @relation(references: [id], fields: [anonymousUserId])
+  rawInput        String
+  context         Json
+  handoff         String
+  createdAt       DateTime      @default(now())
+  anonymousUserId String
+
+  @@map("session")
 }
