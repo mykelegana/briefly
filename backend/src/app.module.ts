@@ -5,9 +5,10 @@ import { LlmModule } from './modules/llm/llm.module';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { HandoffModule } from './modules/handoff/handoff.module';
+import { SessionModule } from './modules/session/session.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), LlmModule, DatabaseModule, HandoffModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), LlmModule, DatabaseModule, HandoffModule, SessionModule],
   controllers: [AppController],
   providers: [AppService],
 })

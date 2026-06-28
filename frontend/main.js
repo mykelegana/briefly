@@ -18,16 +18,17 @@ form.addEventListener('submit', async (e) => {
 
     addMessage(text, 'user');
     input.value = '';
+    input.style.height = 'auto';
     setLoading(true);
 
     const loading = addLoadingMessage('Extracting context');
 
     try {
-        // 1. Extract context from the pasted conversation
+        // 1. Extract context
         const extractRes = await fetch(EXTRACT_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include', // sends the sessionToken cookie
+            credentials: 'include',
             body: JSON.stringify({ text }),
         });
 
@@ -38,10 +39,10 @@ form.addEventListener('submit', async (e) => {
 
         const context = await extractRes.json();
 
-        loading.querySelector('.ai-label + span, .loading-text').textContent =
-            'Generating handoff prompt…';
+        const loadingText = loading.querySelector('.loading-text');
+        if (loadingText) loadingText.textContent = 'Generating handoff prompt';
 
-        // 2. Generate the handoff prompt from extracted context
+        // 2. Generate handoff
         const handoffRes = await fetch(HANDOFF_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -54,13 +55,13 @@ form.addEventListener('submit', async (e) => {
             throw new Error(err.message ?? 'Handoff generation failed.');
         }
 
-        const handoff = await handoffRes.text();
+        let handoff = await handoffRes.text();
+        if (handoff.startsWith('"')) handoff = JSON.parse(handoff);
 
         loading.remove();
-
         addHandoffCard(handoff);
 
-        // 3. Save session in background — don't block UI if this fails
+        // 3. Save session silently
         saveSession(text, context, handoff).catch((err) =>
             console.warn('Session save failed (non-critical):', err),
         );
@@ -81,11 +82,7 @@ async function saveSession(rawInput, context, handoffOutput) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-            rawInput,
-            context,
-            handoffOutput,
-        }),
+        body: JSON.stringify({ rawInput, context, handoffOutput }),
     });
 }
 
@@ -131,11 +128,10 @@ function addLoadingMessage(text) {
 }
 
 function addHandoffCard(handoff) {
-    // Wrapper sits outside .message so it can go full width
     const card = document.createElement('div');
     card.className = 'handoff-card';
 
-    // Header row
+    // Header
     const header = document.createElement('div');
     header.className = 'handoff-card-header';
 
@@ -143,40 +139,12 @@ function addHandoffCard(handoff) {
     title.className = 'handoff-card-title';
     title.textContent = 'Handoff Prompt';
 
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'copy-btn';
-    copyBtn.innerHTML = `
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-    </svg>
-    Copy
-  `;
-
-    copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(handoff).then(() => {
-            copyBtn.classList.add('copied');
-            copyBtn.innerHTML = `
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        Copied
-      `;
-            setTimeout(() => {
-                copyBtn.classList.remove('copied');
-                copyBtn.innerHTML = `
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
-          </svg>
-          Copy
-        `;
-            }, 2000);
-        });
-    });
+    const badge = document.createElement('span');
+    badge.className = 'handoff-card-badge';
+    badge.textContent = 'Ready to paste';
 
     header.appendChild(title);
-    header.appendChild(copyBtn);
+    header.appendChild(badge);
 
     // Body
     const body = document.createElement('div');
@@ -184,10 +152,39 @@ function addHandoffCard(handoff) {
 
     const pre = document.createElement('pre');
     pre.textContent = handoff;
-
     body.appendChild(pre);
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.className = 'handoff-card-footer';
+
+    const hint = document.createElement('span');
+    hint.className = 'handoff-hint';
+    hint.textContent = 'Paste this into any AI to continue without re-explaining.';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'copy-btn';
+    copyBtn.textContent = 'Copy Handoff';
+
+    copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(handoff).then(() => {
+            copyBtn.textContent = 'Copied!';
+            copyBtn.classList.add('copied');
+            setTimeout(() => {
+                copyBtn.textContent = 'Copy Handoff';
+                copyBtn.classList.remove('copied');
+            }, 2000);
+        });
+    });
+
+    footer.appendChild(hint);
+    footer.appendChild(copyBtn);
+
+    // Assemble
     card.appendChild(header);
     card.appendChild(body);
+    card.appendChild(footer);
     chat.appendChild(card);
     scrollToBottom();
 }
@@ -200,8 +197,6 @@ function setLoading(state) {
 function scrollToBottom() {
     chat.scrollTop = chat.scrollHeight;
 }
-
-// ── Auto-grow textarea ────────────────────────────────────────────────────────
 
 input.addEventListener('input', () => {
     input.style.height = 'auto';
