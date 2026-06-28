@@ -7,8 +7,8 @@ import { ConfigService } from '@nestjs/config';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GEMINI_MODEL = 'gemini-2.5-flash-lite'; // lite = less demand, more reliable
-const GROQ_MODEL = 'llama-3.1-8b-instant';    // stable, high context limit, no thinking mode
+const GEMINI_MODEL = 'gemini-2.5-flash-lite'; // fix this before deploying, gemini 3.5 is high traffic now temporary 2.5
+const GROQ_MODEL = 'llama-3.1-8b-instant';
 
 const GEMINI_URL = (apiKey: string) =>
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
