@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,41 +9,86 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./style.css" />
 </head>
-
 <body>
-  <div class="app">
+  <div class="layout">
 
-    <header>
-      <div class="header-left">
-        <span class="logo-mark">B</span>
-        <div>
-          <h1>Briefly</h1>
-          <p>Paste a capped AI conversation — get a handoff prompt to continue anywhere.</p>
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar" id="sidebar">
+
+      <div class="sidebar-profile">
+        <div class="profile-avatar">
+          <img src="./logo.png" alt="Briefly"
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+          <span class="avatar-fallback">B</span>
+        </div>
+        <div class="profile-info">
+          <span class="profile-name">Briefly</span>
+          <span class="profile-sub">Your AI context bridge</span>
         </div>
       </div>
-    </header>
 
-    <main id="chat">
-      <div class="message ai">
-        <span class="ai-label">Briefly</span>
-        Paste your previous AI conversation below and I'll extract the context so you can continue it in any other AI tool without re-explaining everything.
+      <div class="sidebar-stats">
+        <div class="stat-card">
+          <span class="stat-value" id="stat-sessions">—</span>
+          <span class="stat-label">Sessions</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-saved">—</span>
+          <span class="stat-label">Tokens saved</span>
+        </div>
       </div>
-    </main>
 
-    <form id="chat-form">
-      <textarea id="input" placeholder="Paste your conversation here..." rows="3"></textarea>
-      <button type="submit" id="send-btn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-        Send
-      </button>
-    </form>
+      <div class="sidebar-section-label">Recent Sessions</div>
 
+      <div class="sessions-list" id="sessions-list">
+        <div class="sessions-empty">No sessions yet.<br/>Paste a conversation to start.</div>
+      </div>
+
+    </aside>
+
+    <!-- ── Main ── -->
+    <div class="main">
+
+      <header>
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sessions">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="header-brand">
+          <span class="logo-mark">B</span>
+          <div>
+            <h1>Briefly</h1>
+            <p>Paste a capped AI conversation — get a handoff prompt to continue anywhere.</p>
+          </div>
+        </div>
+      </header>
+
+      <main id="chat">
+        <div class="message ai">
+          <span class="ai-label">Briefly</span>
+          <span>Paste your previous AI conversation below and I'll extract the context so you can continue it in any other AI tool without re-explaining everything.</span>
+        </div>
+      </main>
+
+      <form id="chat-form">
+        <textarea id="input" placeholder="Paste your conversation here..." rows="3"></textarea>
+        <button type="submit" id="send-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          Send
+        </button>
+      </form>
+
+    </div>
   </div>
 
   <script src="./main.js"></script>
 </body>
-
 </html>
