@@ -1,32 +1,49 @@
-import { Controller, Post, Get, Body, Param, Delete, Req, Res, HttpCode, HttpStatus } from '@nestjs/common';
-import { SessionService } from './session.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { SaveSessionDto } from './dto/save-session.dto';
+import { SessionService } from './session.service';
 
-const COOKIE_NAME = 'sessionToken';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  maxAge: 1000 * 60 * 60 * 24 * 365, // 1 year
-  // secure: true  ← uncomment in production (HTTPS only)
-};
+const TOKEN_HEADER = 'x-session-token';
 
 @Controller('sessions')
 export class SessionController {
+  private readonly logger = new Logger(SessionController.name);
+
   constructor(private readonly sessionService: SessionService) { }
 
-  private async findAnonymousUser(@Req() req, @Res() res): Promise<string> {
-    let userId = req.cookies?.[COOKIE_NAME];
+  // ── Resolve or create anonymous user from header token ────────────────────
+  // localStorage on frontend → sent as x-session-token header
+  // On first visit: no header → create user → return token in response header
+  // On subsequent visits: header present → use directly, no DB call
+
+  private async resolveUserId(req: Request, res: Response): Promise<string> {
+    let userId = req.headers[TOKEN_HEADER] as string;
 
     if (!userId) {
+      this.logger.log('No token found — creating new anonymous user');
       const user = await this.sessionService.createAnonymousUser();
       userId = user.id;
-      res.cookie(COOKIE_NAME, userId, COOKIE_OPTIONS);
+      res.setHeader(TOKEN_HEADER, userId);
+      this.logger.log(`Token created and sent: ${userId}`);
+    } else {
+      this.logger.log(`Existing token received: ${userId}`);
     }
 
     return userId;
   }
-
-  // ── POST /sessions ────────────────────────────────────────────────────────
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -35,43 +52,37 @@ export class SessionController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const userId = await this.findAnonymousUser(req, res);
+    const userId = await this.resolveUserId(req, res);
     return this.sessionService.saveSession(userId, dto);
   }
-
-  // ── GET /sessions ─────────────────────────────────────────────────────────
 
   @Get()
   async getSessions(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const userId = await this.findAnonymousUser(req, res);
+    const userId = await this.resolveUserId(req, res);
     return this.sessionService.getSessions(userId);
   }
 
-  // ── GET /sessions/:id ─────────────────────────────────────────────────────
-
   @Get(':id')
   async getSession(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const userId = await this.findAnonymousUser(req, res);
+    const userId = await this.resolveUserId(req, res);
     return this.sessionService.getSession(userId, id);
   }
-
-  // ── DELETE /sessions/:id ──────────────────────────────────────────────────
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteSession(
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const userId = await this.findAnonymousUser(req, res);
+    const userId = await this.resolveUserId(req, res);
     return this.sessionService.deleteSession(userId, id);
   }
 }
