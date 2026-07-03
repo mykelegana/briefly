@@ -24,24 +24,19 @@ export class SessionController {
 
   constructor(private readonly sessionService: SessionService) { }
 
-  // ── Resolve or create anonymous user from header token ────────────────────
-  // localStorage on frontend → sent as x-session-token header
-  // On first visit: no header → create user → return token in response header
-  // On subsequent visits: header present → use directly, no DB call
-
   private async resolveUserId(req: Request, res: Response): Promise<string> {
     let userId = req.headers[TOKEN_HEADER] as string;
 
     if (!userId) {
-      this.logger.log('No token found — creating new anonymous user');
+      // Fallback — should never happen since frontend always sends token
+      this.logger.warn('No token in request — this should not happen');
       const user = await this.sessionService.createAnonymousUser();
-      userId = user.id;
-      res.setHeader(TOKEN_HEADER, userId);
-      this.logger.log(`Token created and sent: ${userId}`);
-    } else {
-      this.logger.log(`Existing token received: ${userId}`);
+      res.setHeader('x-session-token', user.id);
+      return user.id;
     }
-
+    // Ensure this user exists in DB — create if first time
+    await this.sessionService.findOrCreateUser(userId);
+    this.logger.log(`Token received: ${userId}`);
     return userId;
   }
 

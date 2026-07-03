@@ -63,4 +63,15 @@ export class SessionService {
         await this.databaseService.session.delete({ where: { id: sessionId } });
         return { message: 'Session deleted.' };
     }
+
+    async findOrCreateUser(id: string) {
+        const existing = await this.databaseService.anonymousUser.findUnique({
+            where: { id },
+        });
+        if (!existing) {
+            await this.databaseService.anonymousUser.create({ data: { id } });
+            this.logger.log(`Created user from frontend token: ${id}`);
+        }
+        return existing;
+    }
 }
