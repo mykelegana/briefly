@@ -2,55 +2,49 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    />
-
-    <title>Briefly AI</title>
-
-    <link rel="stylesheet" href="./style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Briefly</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./style.css" />
 </head>
 
 <body>
+  <div class="app">
 
-    <div class="app">
+    <header>
+      <div class="header-left">
+        <span class="logo-mark">B</span>
+        <div>
+          <h1>Briefly</h1>
+          <p>Paste a capped AI conversation — get a handoff prompt to continue anywhere.</p>
+        </div>
+      </div>
+    </header>
 
-        <header>
-            <h1>Briefly</h1>
-            <p>Extract context from conversations</p>
-        </header>
+    <main id="chat">
+      <div class="message ai">
+        <span class="ai-label">Briefly</span>
+        Paste your previous AI conversation below and I'll extract the context so you can continue it in any other AI tool without re-explaining everything.
+      </div>
+    </main>
 
+    <form id="chat-form">
+      <textarea id="input" placeholder="Paste your conversation here..." rows="3"></textarea>
+      <button type="submit" id="send-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+        Send
+      </button>
+    </form>
 
-        <main id="chat">
+  </div>
 
-            <div class="message ai">
-                Hello 👋 I'm Briefly. Paste your previous conversation here!
-            </div>
-
-        </main>
-
-
-        <form id="chat-form">
-
-            <textarea
-                id="input"
-                placeholder="Paste conversation here..."
-            ></textarea>
-
-
-            <button>
-                Send
-            </button>
-
-        </form>
-
-    </div>
-
-
-    <script src="./main.js"></script>
-
+  <script src="./main.js"></script>
 </body>
 
 </html>

