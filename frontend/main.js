@@ -17,7 +17,14 @@ const TOKEN_KEY = 'briefly_session_token';
 // ── Token helpers (localStorage — no cookie issues) ───────────────────────────
 
 function getToken() {
-    return localStorage.getItem(TOKEN_KEY);
+    let token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+        // Generate UUID on the frontend — no need to wait for server
+        token = crypto.randomUUID();
+        localStorage.setItem(TOKEN_KEY, token);
+        console.log('New token generated:', token);
+    }
+    return token;
 }
 
 function saveToken(token) {
@@ -29,10 +36,8 @@ function saveToken(token) {
 
 // Build headers for every request — always includes token if we have one
 function makeHeaders(withBody = false) {
-    const headers = {};
+    const headers = { 'x-session-token': getToken() }; // always included
     if (withBody) headers['Content-Type'] = 'application/json';
-    const token = getToken();
-    if (token) headers['x-session-token'] = token;
     return headers;
 }
 
