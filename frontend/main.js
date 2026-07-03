@@ -50,8 +50,6 @@ sidebarToggle.addEventListener('click', () => {
 
 // ── Load sessions on startup ──────────────────────────────────────────────────
 
-loadSessions();
-
 async function loadSessions() {
     try {
         const res = await fetch(SESSION_URL, {
@@ -71,6 +69,7 @@ async function loadSessions() {
         console.warn('Could not load sessions:', err);
     }
 }
+loadSessions();
 
 // ── Render sessions ───────────────────────────────────────────────────────────
 
@@ -294,6 +293,9 @@ form.addEventListener('submit', async (e) => {
 // ── Save session ──────────────────────────────────────────────────────────────
 
 async function saveSession(rawInput, context, handoffOutput) {
+    console.log('Saving session with token:', getToken());
+    console.log('Payload:', { rawInput: rawInput?.slice(0, 50), context, handoffOutput: handoffOutput?.slice(0, 50) });
+
     const res = await fetch(SESSION_URL, {
         method: 'POST',
         headers: makeHeaders(true),
@@ -301,13 +303,11 @@ async function saveSession(rawInput, context, handoffOutput) {
     });
     extractToken(res);
 
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: 'Unknown error' }));
-        console.error('Session save error:', err);
-        throw new Error(err.message ?? 'Session save failed');
-    }
+    const body = await res.json().catch(() => null);
+    console.log('Save response:', res.status, body);
 
-    return res.json();
+    if (!res.ok) throw new Error(body?.message ?? 'Session save failed');
+    return body;
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
