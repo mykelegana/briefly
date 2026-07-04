@@ -157,6 +157,15 @@ body {
 
 .session-item:hover { border-color: var(--accent); }
 
+.session-item.active {
+  border-color: var(--accent);
+  background: var(--bg-message);
+}
+ 
+.session-item.active .session-problem {
+  color: var(--accent);
+}
+
 .session-top {
   display: flex;
   align-items: flex-start;
