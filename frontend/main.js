@@ -3,7 +3,6 @@ const input = document.querySelector('#input');
 const chat = document.querySelector('#chat');
 const sendBtn = document.querySelector('#send-btn');
 const sidebar = document.querySelector('#sidebar');
-const sidebarToggle = document.querySelector('#sidebar-toggle');
 const sessionsList = document.querySelector('#sessions-list');
 const statSessions = document.querySelector('#stat-sessions');
 const statSaved = document.querySelector('#stat-saved');
@@ -16,80 +15,62 @@ const SESSION_URL = `${API}/sessions`;
 const TOKEN_KEY = 'briefly_session_token';
 const CHAT_KEY = 'briefly_chat_history';
 
-// ── Token (localStorage — no cookie issues) ───────────────────────────────────
+// ── Token ─────────────────────────────────────────────────────────────────────
 
 function getToken() {
-    let token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-        token = crypto.randomUUID();
-        localStorage.setItem(TOKEN_KEY, token);
-        console.log('New token generated:', token);
+    let t = localStorage.getItem(TOKEN_KEY);
+    if (!t) {
+        t = crypto.randomUUID();
+        localStorage.setItem(TOKEN_KEY, t);
     }
-    return token;
+    return t;
 }
 
 function makeHeaders(withBody = false) {
-    const headers = { 'x-session-token': getToken() };
-    if (withBody) headers['Content-Type'] = 'application/json';
-    return headers;
+    const h = { 'x-session-token': getToken() };
+    if (withBody) h['Content-Type'] = 'application/json';
+    return h;
 }
 
 function extractToken(res) {
-    const token = res.headers.get('x-session-token');
-    if (token) localStorage.setItem(TOKEN_KEY, token);
+    const t = res.headers.get('x-session-token');
+    if (t) localStorage.setItem(TOKEN_KEY, t);
 }
 
-// ── Chat history persistence ──────────────────────────────────────────────────
+// ── Chat persistence ──────────────────────────────────────────────────────────
 
-function loadChatHistory() {
-    try {
-        const raw = localStorage.getItem(CHAT_KEY);
-        return raw ? JSON.parse(raw) : [];
-    } catch {
-        return [];
-    }
+function getChatHistory() {
+    try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); }
+    catch { return []; }
 }
 
-function saveChatHistory(history) {
-    try {
-        localStorage.setItem(CHAT_KEY, JSON.stringify(history));
-    } catch {
-        console.warn('Could not save chat history');
-    }
+function appendChatHistory(entry) {
+    const h = getChatHistory();
+    h.push(entry);
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify(h)); } catch { }
 }
-
-function appendToHistory(entry) {
-    const history = loadChatHistory();
-    history.push(entry);
-    saveChatHistory(history);
-}
-
-// ── Restore chat on page load ─────────────────────────────────────────────────
 
 function restoreChat() {
-    const history = loadChatHistory();
-    if (history.length === 0) return;
+    const history = getChatHistory();
+    if (!history.length) return;
 
-    // Remove the default welcome message
     chat.innerHTML = '';
-
-    history.forEach((entry) => {
-        if (entry.type === 'user') {
-            renderMessage(entry.text, 'user', false);
-        } else if (entry.type === 'ai') {
-            renderMessage(entry.text, 'ai', false);
-        } else if (entry.type === 'handoff') {
-            renderHandoffCard(entry.text, false);
-        }
+    history.forEach((e) => {
+        if (e.type === 'user') renderMsg(e.text, 'user', false);
+        else if (e.type === 'ai') renderMsg(e.text, 'ai', false);
+        else if (e.type === 'handoff') renderReceipt(e.text, false);
     });
-
-    scrollToBottom();
+    scrollBottom();
 }
 
 // ── Sidebar toggle ────────────────────────────────────────────────────────────
 
-sidebarToggle.addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
+document.querySelector('#sidebar-toggle').addEventListener('click', () => {
+    sidebar.classList.add('hidden');
+});
+
+document.querySelector('#sidebar-toggle-open').addEventListener('click', () => {
+    sidebar.classList.remove('hidden');
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -97,7 +78,7 @@ sidebarToggle.addEventListener('click', () => {
 restoreChat();
 loadSessions();
 
-// ── Load sessions ─────────────────────────────────────────────────────────────
+// ── Sessions ──────────────────────────────────────────────────────────────────
 
 async function loadSessions() {
     try {
@@ -107,13 +88,13 @@ async function loadSessions() {
         const sessions = await res.json();
         renderSessions(sessions);
     } catch (err) {
-        console.warn('Could not load sessions:', err);
+        console.warn('loadSessions:', err);
     }
 }
 
 function renderSessions(sessions) {
-    if (!sessions || sessions.length === 0) {
-        sessionsList.innerHTML = `<div class="sessions-empty">No sessions yet.<br/>Paste a conversation to start.</div>`;
+    if (!sessions?.length) {
+        sessionsList.innerHTML = '<div class="session-nav-empty">No sessions yet. Paste a conversation to start.</div>';
         statSessions.textContent = '0';
         statSaved.textContent = '0';
         return;
@@ -122,88 +103,77 @@ function renderSessions(sessions) {
     statSessions.textContent = sessions.length;
     sessionsList.innerHTML = '';
 
-    let totalIn = 0;
-    let totalOut = 0;
+    let totalIn = 0, totalOut = 0;
 
-    sessions.forEach((session) => {
-        const context = session.context ?? {};
-        const problem = context.problem ?? context.conversationSummary ?? 'Session';
-        const date = formatDate(session.createdAt);
-
-        const inputTokens = session.rawInput ? Math.round(session.rawInput.length / 4) : 0;
-        const outputTokens = session.handoff ? Math.round(session.handoff.length / 4)
-            : Math.round(JSON.stringify(context).length / 4);
-
-        totalIn += inputTokens;
-        totalOut += outputTokens;
-
-        const savedPct = inputTokens > 0
-            ? Math.max(0, Math.round((1 - outputTokens / inputTokens) * 100))
-            : 0;
-
-        const item = buildSessionItem(session.id, problem, date, inputTokens, outputTokens, savedPct);
-        sessionsList.appendChild(item);
+    sessions.forEach((s) => {
+        const ctx = s.context ?? {};
+        const problem = ctx.problem ?? ctx.conversationSummary ?? 'Session';
+        const date = fmtDate(s.createdAt);
+        const inT = s.rawInput ? Math.round(s.rawInput.length / 4) : 0;
+        const outT = s.handoff ? Math.round(s.handoff.length / 4)
+            : Math.round(JSON.stringify(ctx).length / 4);
+        totalIn += inT;
+        totalOut += outT;
+        const pct = inT > 0 ? Math.max(0, Math.round((1 - outT / inT) * 100)) : 0;
+        sessionsList.appendChild(buildRow(s.id, problem, date, inT, outT, pct));
     });
 
-    const totalSaved = Math.max(0, totalIn - totalOut);
-    statSaved.textContent = totalSaved > 1000
-        ? `${(totalSaved / 1000).toFixed(1)}k`
-        : String(totalSaved);
+    const saved = Math.max(0, totalIn - totalOut);
+    statSaved.textContent = saved > 1000 ? `${(saved / 1000).toFixed(1)}k` : String(saved);
 }
 
-function buildSessionItem(id, problem, date, inputTokens, outputTokens, savedPct) {
-    const item = document.createElement('div');
-    item.className = 'session-item';
-    item.dataset.id = id;
+function buildRow(id, problem, date, inT, outT, pct) {
+    const row = document.createElement('div');
+    row.className = 'session-row';
+    row.dataset.id = id;
 
-    // Click to load session
-    item.addEventListener('click', () => loadSession(id, item));
+    row.addEventListener('click', () => loadSession(id, row));
 
-    const top = document.createElement('div');
-    top.className = 'session-top';
+    // Donut
+    const donutWrap = document.createElement('div');
+    donutWrap.className = 'session-row-donut';
+    donutWrap.appendChild(buildDonut(pct, 34));
 
-    const problemEl = document.createElement('span');
-    problemEl.className = 'session-problem';
-    problemEl.textContent = problem;
+    // Body
+    const body = document.createElement('div');
+    body.className = 'session-row-body';
 
-    const dateEl = document.createElement('span');
-    dateEl.className = 'session-date';
-    dateEl.textContent = date;
+    const title = document.createElement('div');
+    title.className = 'session-row-title';
+    title.textContent = problem;
 
-    top.appendChild(problemEl);
-    top.appendChild(dateEl);
+    const meta = document.createElement('div');
+    meta.className = 'session-row-meta';
 
-    const savings = document.createElement('div');
-    savings.className = 'session-savings';
-    savings.appendChild(buildDonut(savedPct));
+    const sav = document.createElement('span');
+    sav.className = 'session-row-savings';
+    sav.textContent = `${pct}% saved`;
 
-    const info = document.createElement('div');
-    info.className = 'savings-info';
+    const dt = document.createElement('span');
+    dt.className = 'session-row-date';
+    dt.textContent = date;
 
-    const pct = document.createElement('span');
-    pct.className = 'savings-pct';
-    pct.textContent = `${savedPct}% saved`;
+    meta.appendChild(sav);
+    meta.appendChild(dt);
 
-    const barWrap = document.createElement('div');
-    barWrap.className = 'savings-bar-wrap';
-    barWrap.appendChild(buildBar('Input', inputTokens, inputTokens, 'input'));
-    barWrap.appendChild(buildBar('Output', outputTokens, inputTokens, 'output'));
+    // Mini bars
+    const bars = document.createElement('div');
+    bars.className = 'bar-mini-wrap';
+    bars.appendChild(buildBarMini('Input', inT, inT, 'in'));
+    bars.appendChild(buildBarMini('Output', outT, inT, 'out'));
 
-    info.appendChild(pct);
-    info.appendChild(barWrap);
-    savings.appendChild(info);
+    body.appendChild(title);
+    body.appendChild(meta);
+    body.appendChild(bars);
 
-    item.appendChild(top);
-    item.appendChild(savings);
-    return item;
+    row.appendChild(donutWrap);
+    row.appendChild(body);
+    return row;
 }
 
-// ── Load a specific session ───────────────────────────────────────────────────
-
-async function loadSession(id, itemEl) {
-    // Mark active in sidebar
-    document.querySelectorAll('.session-item').forEach((el) => el.classList.remove('active'));
-    itemEl.classList.add('active');
+async function loadSession(id, rowEl) {
+    document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
+    rowEl.classList.add('active');
 
     try {
         const res = await fetch(`${SESSION_URL}/${id}`, { headers: makeHeaders() });
@@ -211,20 +181,12 @@ async function loadSession(id, itemEl) {
         if (!res.ok) return;
         const session = await res.json();
 
-        // Clear chat and show this session
         chat.innerHTML = '';
-
-        if (session.rawInput) {
-            renderMessage(session.rawInput, 'user', false);
-        }
-
-        if (session.handoff) {
-            renderHandoffCard(session.handoff, false);
-        }
-
-        scrollToBottom();
+        if (session.rawInput) renderMsg(session.rawInput, 'user', false);
+        if (session.handoff) renderReceipt(session.handoff, false);
+        scrollBottom();
     } catch (err) {
-        console.warn('Could not load session:', err);
+        console.warn('loadSession:', err);
     }
 }
 
@@ -235,17 +197,16 @@ form.addEventListener('submit', async (e) => {
     const text = input.value.trim();
     if (!text) return;
 
-    // Deselect any active session
-    document.querySelectorAll('.session-item').forEach((el) => el.classList.remove('active'));
+    document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
 
-    renderMessage(text, 'user', true);
-    appendToHistory({ type: 'user', text });
+    renderMsg(text, 'user', true);
+    appendChatHistory({ type: 'user', text });
 
     input.value = '';
     input.style.height = 'auto';
     setLoading(true);
 
-    const loading = addLoadingMessage('Extracting context');
+    const loading = renderLoading('Extracting context');
 
     try {
         const extractRes = await fetch(EXTRACT_URL, {
@@ -261,8 +222,8 @@ form.addEventListener('submit', async (e) => {
         }
 
         const context = await extractRes.json();
-        const loadingText = loading.querySelector('.loading-text');
-        if (loadingText) loadingText.textContent = 'Generating handoff prompt';
+        const lt = loading.querySelector('.loading-text');
+        if (lt) lt.textContent = 'Generating handoff';
 
         const handoffRes = await fetch(HANDOFF_URL, {
             method: 'POST',
@@ -280,25 +241,25 @@ form.addEventListener('submit', async (e) => {
         if (handoff.startsWith('"')) handoff = JSON.parse(handoff);
 
         loading.remove();
-        renderHandoffCard(handoff, true);
-        appendToHistory({ type: 'handoff', text: handoff });
+        renderReceipt(handoff, true);
+        appendChatHistory({ type: 'handoff', text: handoff });
 
         saveSession(text, context, handoff)
             .then(() => loadSessions())
-            .catch((err) => console.error('Session save failed:', err));
+            .catch((err) => console.error('saveSession:', err));
 
     } catch (err) {
         loading.remove();
-        const errMsg = `Something went wrong: ${err.message}`;
-        renderMessage(errMsg, 'ai', true);
-        appendToHistory({ type: 'ai', text: errMsg });
+        const msg = `Something went wrong: ${err.message}`;
+        renderMsg(msg, 'ai', true);
+        appendChatHistory({ type: 'ai', text: msg });
         console.error(err);
     } finally {
         setLoading(false);
     }
 });
 
-// ── Save session ──────────────────────────────────────────────────────────────
+// ── Save ──────────────────────────────────────────────────────────────────────
 
 async function saveSession(rawInput, context, handoffOutput) {
     const res = await fetch(SESSION_URL, {
@@ -307,156 +268,186 @@ async function saveSession(rawInput, context, handoffOutput) {
         body: JSON.stringify({ rawInput, context, handoffOutput }),
     });
     extractToken(res);
-
     if (!res.ok) {
         const err = await res.json().catch(() => ({ message: 'Unknown error' }));
         throw new Error(err.message ?? 'Session save failed');
     }
-
     return res.json();
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
 
-// save=true means append to history (only for new messages, not restores)
-function renderMessage(text, type, save) {
-    const div = document.createElement('div');
-    div.className = `message ${type}`;
+function renderMsg(text, type, save) {
+    const wrap = document.createElement('div');
+    wrap.className = `msg ${type}`;
 
     if (type === 'ai') {
         const label = document.createElement('span');
-        label.className = 'ai-label';
+        label.className = 'msg-label';
         label.textContent = 'Briefly';
-        div.appendChild(label);
+        wrap.appendChild(label);
     }
 
-    const content = document.createElement('span');
-    content.textContent = text;
-    div.appendChild(content);
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
 
-    chat.appendChild(div);
-    if (save) scrollToBottom();
-    return div;
+    chat.appendChild(wrap);
+    if (save) scrollBottom();
+    return wrap;
 }
 
-function addLoadingMessage(text) {
-    const div = document.createElement('div');
-    div.className = 'message ai';
+function renderLoading(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ai';
+
     const label = document.createElement('span');
-    label.className = 'ai-label';
+    label.className = 'msg-label';
     label.textContent = 'Briefly';
-    const content = document.createElement('span');
-    content.className = 'loading-text loading-dots';
-    content.textContent = text;
-    div.appendChild(label);
-    div.appendChild(content);
-    chat.appendChild(div);
-    scrollToBottom();
-    return div;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+
+    const span = document.createElement('span');
+    span.className = 'loading-text loading-dots';
+    span.textContent = text;
+
+    bubble.appendChild(span);
+    wrap.appendChild(label);
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    scrollBottom();
+    return wrap;
 }
 
-function renderHandoffCard(handoff, save) {
+function renderReceipt(handoff, save) {
     const card = document.createElement('div');
-    card.className = 'handoff-card';
+    card.className = 'receipt';
 
-    const header = document.createElement('div');
-    header.className = 'handoff-card-header';
-    const title = document.createElement('span');
-    title.className = 'handoff-card-title';
-    title.textContent = 'Handoff Prompt';
-    const badge = document.createElement('span');
-    badge.className = 'handoff-card-badge';
-    badge.textContent = 'Ready to paste';
-    header.appendChild(title);
-    header.appendChild(badge);
+    // Topbar
+    const topbar = document.createElement('div');
+    topbar.className = 'receipt-topbar';
 
+    const left = document.createElement('div');
+    left.className = 'receipt-left';
+
+    const dot = document.createElement('div');
+    dot.className = 'receipt-dot';
+
+    const label = document.createElement('span');
+    label.className = 'receipt-label';
+    label.textContent = 'Handoff prompt';
+
+    left.appendChild(dot);
+    left.appendChild(label);
+
+    const tag = document.createElement('span');
+    tag.className = 'receipt-tag';
+    tag.textContent = 'Ready to paste';
+
+    topbar.appendChild(left);
+    topbar.appendChild(tag);
+
+    // Body
     const body = document.createElement('div');
-    body.className = 'handoff-body';
+    body.className = 'receipt-body';
+
     const pre = document.createElement('pre');
     pre.textContent = handoff;
     body.appendChild(pre);
 
+    // Footer
     const footer = document.createElement('div');
-    footer.className = 'handoff-card-footer';
+    footer.className = 'receipt-footer';
+
     const hint = document.createElement('span');
-    hint.className = 'handoff-hint';
-    hint.textContent = 'Paste this into any AI to continue without re-explaining.';
+    hint.className = 'receipt-footer-hint';
+    hint.textContent = 'Drop this into any AI to continue without re-explaining.';
+
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
-    copyBtn.className = 'copy-btn';
-    copyBtn.textContent = 'Copy Handoff';
+    copyBtn.className = 'btn-copy';
+    copyBtn.textContent = 'Copy handoff';
+
     copyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(handoff).then(() => {
-            copyBtn.textContent = 'Copied!';
+            copyBtn.textContent = 'Copied';
             copyBtn.classList.add('copied');
             setTimeout(() => {
-                copyBtn.textContent = 'Copy Handoff';
+                copyBtn.textContent = 'Copy handoff';
                 copyBtn.classList.remove('copied');
             }, 2000);
         });
     });
+
     footer.appendChild(hint);
     footer.appendChild(copyBtn);
 
-    card.appendChild(header);
+    card.appendChild(topbar);
     card.appendChild(body);
     card.appendChild(footer);
     chat.appendChild(card);
-    if (save) scrollToBottom();
+    if (save) scrollBottom();
 }
 
-// ── Donut + bars ──────────────────────────────────────────────────────────────
+// ── Donut + mini bars ─────────────────────────────────────────────────────────
 
-function buildDonut(pct) {
-    const size = 40, r = 15;
+function buildDonut(pct, size = 40) {
+    const r = (size / 2) - 4;
     const circ = 2 * Math.PI * r;
     const filled = Math.max(0, Math.min(100, pct));
     const offset = circ - (filled / 100) * circ;
+    const cx = size / 2, cy = size / 2;
 
     const wrap = document.createElement('div');
-    wrap.className = 'donut-wrap';
     wrap.innerHTML = `
     <svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle class="donut-track" cx="${size / 2}" cy="${size / 2}" r="${r}"/>
+      <circle class="donut-track" cx="${cx}" cy="${cy}" r="${r}"/>
       <circle class="donut-fill"
-        cx="${size / 2}" cy="${size / 2}" r="${r}"
+        cx="${cx}" cy="${cy}" r="${r}"
         stroke-dasharray="${circ}" stroke-dashoffset="${circ}"
         data-offset="${offset}"/>
-      <text x="${size / 2}" y="${size / 2 + 4}" text-anchor="middle"
-        font-size="8" font-family="Inter,sans-serif"
-        font-weight="600" fill="#10B981">${filled}%</text>
+      <text x="${cx}" y="${cy + 3.5}" text-anchor="middle"
+        font-size="7.5" font-family="Inter,sans-serif"
+        font-weight="600" fill="#34D399">${filled}%</text>
     </svg>`;
+
     requestAnimationFrame(() => {
         const fill = wrap.querySelector('.donut-fill');
-        if (fill) setTimeout(() => { fill.style.strokeDashoffset = fill.dataset.offset; }, 50);
+        if (fill) setTimeout(() => { fill.style.strokeDashoffset = fill.dataset.offset; }, 60);
     });
     return wrap;
 }
 
-function buildBar(label, value, max, type) {
+function buildBarMini(label, value, max, type) {
     const pct = max > 0 ? Math.round((value / max) * 100) : 0;
     const display = value > 1000 ? `${(value / 1000).toFixed(1)}k` : String(value);
     const row = document.createElement('div');
-    row.className = 'savings-bar-row';
+    row.className = 'bar-mini-row';
     row.innerHTML = `
-    <span class="bar-label">${label}</span>
-    <div class="bar-track"><div class="bar-fill ${type}" style="width:0%" data-pct="${pct}%"></div></div>
-    <span class="bar-count">${display}</span>`;
+    <span class="bar-mini-label">${label}</span>
+    <div class="bar-mini-track">
+      <div class="bar-mini-fill ${type}" style="width:0%" data-pct="${pct}%"></div>
+    </div>
+    <span class="bar-mini-count">${display}</span>`;
     requestAnimationFrame(() => {
-        const fill = row.querySelector('.bar-fill');
-        if (fill) setTimeout(() => { fill.style.width = fill.dataset.pct; }, 50);
+        const fill = row.querySelector('.bar-mini-fill');
+        if (fill) setTimeout(() => { fill.style.width = fill.dataset.pct; }, 60);
     });
     return row;
 }
 
-function formatDate(iso) {
+// ── Utils ─────────────────────────────────────────────────────────────────────
+
+function fmtDate(iso) {
     if (!iso) return '';
     const d = new Date(iso);
-    const diffH = Math.floor((Date.now() - d) / 3600000);
-    if (diffH < 1) return 'just now';
-    if (diffH < 24) return `${diffH}h ago`;
-    const diffD = Math.floor(diffH / 24);
-    if (diffD < 7) return `${diffD}d ago`;
+    const h = Math.floor((Date.now() - d) / 3600000);
+    if (h < 1) return 'just now';
+    if (h < 24) return `${h}h ago`;
+    const days = Math.floor(h / 24);
+    if (days < 7) return `${days}d ago`;
     return d.toLocaleDateString();
 }
 
@@ -465,11 +456,11 @@ function setLoading(state) {
     input.disabled = state;
 }
 
-function scrollToBottom() {
+function scrollBottom() {
     chat.scrollTop = chat.scrollHeight;
 }
 
 input.addEventListener('input', () => {
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 130) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 180) + 'px';
 });

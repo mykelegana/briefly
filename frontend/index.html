@@ -3,88 +3,115 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Briefly</title>
+  <title>Briefly — AI Context Bridge</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <div class="layout">
+  <div class="shell">
 
     <!-- ── Sidebar ── -->
-    <aside class="sidebar" id="sidebar">
+    <aside class="rail" id="sidebar">
 
-      <div class="sidebar-profile">
-        <div class="profile-avatar">
-          <img src="./logo.png" alt="Briefly"
-            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
-          <span class="avatar-fallback">B</span>
+      <div class="rail-header">
+        <div class="brand">
+          <div class="brand-mark">
+            <img src="./logo.png" alt="Briefly" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+            <span class="brand-mark-fallback">B</span>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">Briefly</span>
+            <span class="brand-tagline">AI context bridge</span>
+          </div>
         </div>
-        <div class="profile-info">
-          <span class="profile-name">Briefly</span>
-          <span class="profile-sub">Your AI context bridge</span>
+        <button class="rail-close" id="sidebar-toggle" title="Close sidebar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="rail-stats">
+        <div class="kpi">
+          <span class="kpi-n" id="stat-sessions">—</span>
+          <span class="kpi-l">Sessions</span>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi">
+          <span class="kpi-n" id="stat-saved">—</span>
+          <span class="kpi-l">Tokens saved</span>
         </div>
       </div>
 
-      <div class="sidebar-stats">
-        <div class="stat-card">
-          <span class="stat-value" id="stat-sessions">—</span>
-          <span class="stat-label">Sessions</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-saved">—</span>
-          <span class="stat-label">Tokens saved</span>
-        </div>
+      <div class="rail-section-header">
+        <span>Recent</span>
       </div>
 
-      <div class="sidebar-section-label">Recent Sessions</div>
-
-      <div class="sessions-list" id="sessions-list">
-        <div class="sessions-empty">No sessions yet.<br/>Paste a conversation to start.</div>
-      </div>
+      <nav class="session-nav" id="sessions-list">
+        <div class="session-nav-empty">No sessions yet. Paste a conversation to start.</div>
+      </nav>
 
     </aside>
 
     <!-- ── Main ── -->
-    <div class="main">
+    <div class="workspace">
 
-      <header>
-        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sessions">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
+      <div class="topbar">
+        <button class="topbar-btn" id="sidebar-toggle-open" title="Open sidebar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
         </button>
-        <div class="header-brand">
-          <span class="logo-mark">B</span>
-          <div>
-            <h1>Briefly</h1>
-            <p>Paste a capped AI conversation — get a handoff prompt to continue anywhere.</p>
-          </div>
+        <div class="topbar-brand">
+          <span class="topbar-logo">B</span>
+          <span class="topbar-title">Briefly</span>
         </div>
-      </header>
+        <div class="topbar-right">
+          <span class="topbar-hint">Paste → Extract → Handoff</span>
+        </div>
+      </div>
 
-      <main id="chat">
-        <div class="message ai">
-          <span class="ai-label">Briefly</span>
-          <span>Paste your previous AI conversation below and I'll extract the context so you can continue it in any other AI tool without re-explaining everything.</span>
+      <main class="feed" id="chat">
+        <div class="feed-welcome">
+          <div class="welcome-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <h2>Continue your AI conversation anywhere</h2>
+          <p>Paste a conversation that hit a context limit below. Briefly extracts the key context and generates a handoff prompt you can drop into any AI tool — without re-explaining your entire project.</p>
+          <div class="welcome-steps">
+            <div class="step"><span class="step-n">1</span><span>Paste your capped AI conversation</span></div>
+            <div class="step"><span class="step-n">2</span><span>Briefly extracts context and state</span></div>
+            <div class="step"><span class="step-n">3</span><span>Copy the handoff prompt and continue</span></div>
+          </div>
         </div>
       </main>
 
-      <form id="chat-form">
-        <textarea id="input" placeholder="Paste your conversation here..." rows="3"></textarea>
-        <button type="submit" id="send-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-          Send
-        </button>
-      </form>
+      <div class="compose-wrap">
+        <form id="chat-form" class="compose">
+          <textarea
+            id="input"
+            class="compose-input"
+            placeholder="Paste your conversation here..."
+            rows="3"
+          ></textarea>
+          <div class="compose-footer">
+            <span class="compose-hint">Supports any AI conversation — Claude, ChatGPT, Gemini, and more</span>
+            <button type="submit" id="send-btn" class="compose-send">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+              Extract
+            </button>
+          </div>
+        </form>
+      </div>
 
     </div>
   </div>
