@@ -7,10 +7,50 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://kit.fontawesome.com/a0469f5dee.js" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
+
+  <!-- ── Session rename modal ── -->
+  <div class="modal-overlay" id="rename-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Rename session</span>
+        <button class="modal-close" id="rename-cancel-x"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="text" class="modal-input" id="rename-input" placeholder="Session name" maxlength="80" />
+      <div class="modal-actions">
+        <button class="modal-btn-ghost" id="rename-cancel">Cancel</button>
+        <button class="modal-btn-primary" id="rename-confirm">Rename</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete confirm modal ── -->
+  <div class="modal-overlay" id="delete-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Delete session</span>
+        <button class="modal-close" id="delete-cancel-x"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="modal-body">This will permanently delete this session and its handoff prompt. This action cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="modal-btn-ghost" id="delete-cancel">Cancel</button>
+        <button class="modal-btn-danger" id="delete-confirm">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <div class="shell">
+
+    <!-- ── Sidebar collapsed logo (visible when rail is hidden) ── -->
+    <div class="rail-collapsed-logo" id="rail-collapsed-logo" title="Open sessions">
+      <div class="rcl-mark">
+        <img src="./logo.png" alt="Briefly" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+        <span class="rcl-fallback">B</span>
+      </div>
+    </div>
 
     <!-- ── Sidebar ── -->
     <aside class="rail" id="sidebar">
@@ -27,16 +67,22 @@
           </div>
         </div>
         <button class="rail-close" id="sidebar-toggle" title="Close sidebar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 18l-6-6 6-6"/>
-          </svg>
+          <i class="fa-solid fa-angles-left"></i>
+        </button>
+      </div>
+
+      <!-- New context button -->
+      <div class="rail-new-wrap">
+        <button class="btn-new-context" id="btn-new-context">
+          <i class="fa-solid fa-plus"></i>
+          New context
         </button>
       </div>
 
       <div class="rail-stats">
         <div class="kpi">
           <span class="kpi-n" id="stat-sessions">—</span>
-          <span class="kpi-l">Sessions</span>
+          <span class="kpi-l">Handoffs</span>
         </div>
         <div class="kpi-divider"></div>
         <div class="kpi">
@@ -60,16 +106,34 @@
 
       <div class="topbar">
         <button class="topbar-btn" id="sidebar-toggle-open" title="Open sidebar">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6"/>
-            <line x1="3" y1="12" x2="21" y2="12"/>
-            <line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
+          <i class="fa-solid fa-bars"></i>
         </button>
-        <div class="topbar-brand">
+
+        <!-- Session title (shown when a session is active) -->
+        <div class="topbar-session-title" id="topbar-session-title">
+          <span class="topbar-session-name" id="topbar-session-name"></span>
+          <div class="topbar-session-menu-wrap">
+            <button class="topbar-session-menu-btn" id="topbar-session-menu-btn" title="Session options">
+              <i class="fa-solid fa-chevron-down"></i>
+            </button>
+            <div class="topbar-dropdown" id="topbar-dropdown">
+              <button class="topbar-dropdown-item" id="topbar-rename">
+                <i class="fa-regular fa-pen-to-square"></i> Rename
+              </button>
+              <div class="topbar-dropdown-divider"></div>
+              <button class="topbar-dropdown-item danger" id="topbar-delete">
+                <i class="fa-regular fa-trash-can"></i> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Default brand (shown when no session active) -->
+        <div class="topbar-brand" id="topbar-brand">
           <span class="topbar-logo">B</span>
           <span class="topbar-title">Briefly</span>
         </div>
+
         <div class="topbar-right">
           <span class="topbar-hint">Paste → Extract → Handoff</span>
         </div>
@@ -78,9 +142,7 @@
       <main class="feed" id="chat">
         <div class="feed-welcome">
           <div class="welcome-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
+            <i class="fa-regular fa-comments"></i>
           </div>
           <h2>Continue your AI conversation anywhere</h2>
           <p>Paste a conversation that hit a context limit below. Briefly extracts the key context and generates a handoff prompt you can drop into any AI tool — without re-explaining your entire project.</p>
@@ -103,10 +165,7 @@
           <div class="compose-footer">
             <span class="compose-hint">Supports any AI conversation — Claude, ChatGPT, Gemini, and more</span>
             <button type="submit" id="send-btn" class="compose-send">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
+              <i class="fa-solid fa-paper-plane"></i>
               Extract
             </button>
           </div>

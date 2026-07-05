@@ -15,14 +15,16 @@ const SESSION_URL = `${API}/sessions`;
 const TOKEN_KEY = 'briefly_session_token';
 const CHAT_KEY = 'briefly_chat_history';
 
+// ── Active session state ──────────────────────────────────────────────────────
+let activeSessionId = null;
+let activeSessionName = null;
+let allSessions = [];
+
 // ── Token ─────────────────────────────────────────────────────────────────────
 
 function getToken() {
     let t = localStorage.getItem(TOKEN_KEY);
-    if (!t) {
-        t = crypto.randomUUID();
-        localStorage.setItem(TOKEN_KEY, t);
-    }
+    if (!t) { t = crypto.randomUUID(); localStorage.setItem(TOKEN_KEY, t); }
     return t;
 }
 
@@ -53,7 +55,6 @@ function appendChatHistory(entry) {
 function restoreChat() {
     const history = getChatHistory();
     if (!history.length) return;
-
     chat.innerHTML = '';
     history.forEach((e) => {
         if (e.type === 'user') renderMsg(e.text, 'user', false);
@@ -63,14 +64,205 @@ function restoreChat() {
     scrollBottom();
 }
 
-// ── Sidebar toggle ────────────────────────────────────────────────────────────
+// ── Sidebar collapse / expand ─────────────────────────────────────────────────
 
-document.querySelector('#sidebar-toggle').addEventListener('click', () => {
+const collapsedLogo = document.querySelector('#rail-collapsed-logo');
+
+function closeSidebar() {
     sidebar.classList.add('hidden');
+    collapsedLogo.classList.add('visible');
+}
+
+function openSidebar() {
+    sidebar.classList.remove('hidden');
+    collapsedLogo.classList.remove('visible');
+}
+
+document.querySelector('#sidebar-toggle').addEventListener('click', closeSidebar);
+document.querySelector('#sidebar-toggle-open').addEventListener('click', openSidebar);
+collapsedLogo.addEventListener('click', openSidebar);
+
+// ── New context ───────────────────────────────────────────────────────────────
+
+document.querySelector('#btn-new-context').addEventListener('click', () => {
+    // Clear chat and history — start fresh
+    chat.innerHTML = '';
+    try { localStorage.removeItem(CHAT_KEY); } catch { }
+    setActiveSession(null, null);
+    // Show welcome screen again
+    const welcome = document.createElement('div');
+    welcome.className = 'feed-welcome';
+    welcome.innerHTML = `
+    <div class="welcome-icon"><i class="fa-regular fa-comments"></i></div>
+    <h2>Continue your AI conversation anywhere</h2>
+    <p>Paste a conversation that hit a context limit below. Briefly extracts the key context and generates a handoff prompt you can drop into any AI tool — without re-explaining your entire project.</p>
+    <div class="welcome-steps">
+      <div class="step"><span class="step-n">1</span><span>Paste your capped AI conversation</span></div>
+      <div class="step"><span class="step-n">2</span><span>Briefly extracts context and state</span></div>
+      <div class="step"><span class="step-n">3</span><span>Copy the handoff prompt and continue</span></div>
+    </div>`;
+    chat.appendChild(welcome);
+    document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
+    input.focus();
 });
 
-document.querySelector('#sidebar-toggle-open').addEventListener('click', () => {
-    sidebar.classList.remove('hidden');
+// ── Topbar session title ──────────────────────────────────────────────────────
+
+const topbarBrand = document.querySelector('#topbar-brand');
+const topbarSessionTitle = document.querySelector('#topbar-session-title');
+const topbarSessionName = document.querySelector('#topbar-session-name');
+const topbarDropdown = document.querySelector('#topbar-dropdown');
+const topbarMenuBtn = document.querySelector('#topbar-session-menu-btn');
+
+function setActiveSession(id, name) {
+    activeSessionId = id;
+    activeSessionName = name;
+
+    if (id) {
+        topbarBrand.classList.add('hidden');
+        topbarSessionTitle.classList.add('visible');
+        topbarSessionName.textContent = name || 'Session';
+    } else {
+        topbarBrand.classList.remove('hidden');
+        topbarSessionTitle.classList.remove('visible');
+        topbarDropdown.classList.remove('open');
+    }
+}
+
+topbarMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    topbarDropdown.classList.toggle('open');
+});
+
+document.querySelector('#topbar-rename').addEventListener('click', () => {
+    topbarDropdown.classList.remove('open');
+    if (activeSessionId) openRenameModal(activeSessionId, activeSessionName);
+});
+
+document.querySelector('#topbar-delete').addEventListener('click', () => {
+    topbarDropdown.classList.remove('open');
+    if (activeSessionId) openDeleteModal(activeSessionId);
+});
+
+// ── Rename modal ──────────────────────────────────────────────────────────────
+
+const renameOverlay = document.querySelector('#rename-overlay');
+const renameInput = document.querySelector('#rename-input');
+const renameConfirm = document.querySelector('#rename-confirm');
+let renamingId = null;
+
+function openRenameModal(id, currentName) {
+    renamingId = id;
+    renameInput.value = currentName || '';
+    renameOverlay.classList.add('open');
+    setTimeout(() => { renameInput.focus(); renameInput.select(); }, 50);
+}
+
+function closeRenameModal() {
+    renameOverlay.classList.remove('open');
+    renamingId = null;
+}
+
+document.querySelector('#rename-cancel').addEventListener('click', closeRenameModal);
+document.querySelector('#rename-cancel-x').addEventListener('click', closeRenameModal);
+
+renameConfirm.addEventListener('click', async () => {
+    const newName = renameInput.value.trim();
+    if (!newName || !renamingId) return;
+    await doRenameSession(renamingId, newName);
+    closeRenameModal();
+});
+
+renameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') renameConfirm.click();
+    if (e.key === 'Escape') closeRenameModal();
+});
+
+async function doRenameSession(id, newName) {
+    // Optimistic UI update
+    const row = document.querySelector(`.session-row[data-id="${id}"]`);
+    if (row) {
+        const titleEl = row.querySelector('.session-row-title');
+        if (titleEl) titleEl.textContent = newName;
+    }
+    if (activeSessionId === id) {
+        activeSessionName = newName;
+        topbarSessionName.textContent = newName;
+    }
+    // Update in allSessions
+    const s = allSessions.find(s => String(s.id) === String(id));
+    if (s) s._name = newName;
+
+    // NOTE: backend rename endpoint not yet implemented — update locally only
+    // When backend supports PATCH /sessions/:id, call it here
+    console.log('Renamed session', id, 'to', newName);
+}
+
+// ── Delete modal ──────────────────────────────────────────────────────────────
+
+const deleteOverlay = document.querySelector('#delete-overlay');
+const deleteConfirm = document.querySelector('#delete-confirm');
+let deletingId = null;
+
+function openDeleteModal(id) {
+    deletingId = id;
+    deleteOverlay.classList.add('open');
+}
+
+function closeDeleteModal() {
+    deleteOverlay.classList.remove('open');
+    deletingId = null;
+}
+
+document.querySelector('#delete-cancel').addEventListener('click', closeDeleteModal);
+document.querySelector('#delete-cancel-x').addEventListener('click', closeDeleteModal);
+
+deleteConfirm.addEventListener('click', async () => {
+    if (!deletingId) return;
+    await doDeleteSession(deletingId);
+    closeDeleteModal();
+});
+
+async function doDeleteSession(id) {
+    try {
+        const res = await fetch(`${SESSION_URL}/${id}`, {
+            method: 'DELETE',
+            headers: makeHeaders(),
+        });
+        extractToken(res);
+    } catch (err) {
+        console.warn('Delete failed:', err);
+    }
+
+    // Remove row from sidebar
+    const row = document.querySelector(`.session-row[data-id="${id}"]`);
+    if (row) row.remove();
+
+    // If deleted session was active, go back to blank state
+    if (activeSessionId === String(id) || activeSessionId === id) {
+        chat.innerHTML = '';
+        try { localStorage.removeItem(CHAT_KEY); } catch { }
+        setActiveSession(null, null);
+    }
+
+    // Reload sessions to update stats
+    loadSessions();
+}
+
+// ── Close dropdowns when clicking outside ─────────────────────────────────────
+
+document.addEventListener('click', (e) => {
+    // Close topbar dropdown
+    if (!topbarMenuBtn.contains(e.target) && !topbarDropdown.contains(e.target)) {
+        topbarDropdown.classList.remove('open');
+    }
+    // Close any open session row dropdowns
+    document.querySelectorAll('.session-row-dropdown.open').forEach(dd => {
+        dd.classList.remove('open');
+    });
+    // Close modals on overlay click
+    if (e.target === renameOverlay) closeRenameModal();
+    if (e.target === deleteOverlay) closeDeleteModal();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -86,6 +278,7 @@ async function loadSessions() {
         extractToken(res);
         if (!res.ok) return;
         const sessions = await res.json();
+        allSessions = sessions;
         renderSessions(sessions);
     } catch (err) {
         console.warn('loadSessions:', err);
@@ -107,7 +300,7 @@ function renderSessions(sessions) {
 
     sessions.forEach((s) => {
         const ctx = s.context ?? {};
-        const problem = ctx.problem ?? ctx.conversationSummary ?? 'Session';
+        const problem = s._name || ctx.problem || ctx.conversationSummary || 'Session';
         const date = fmtDate(s.createdAt);
         const inT = s.rawInput ? Math.round(s.rawInput.length / 4) : 0;
         const outT = s.handoff ? Math.round(s.handoff.length / 4)
@@ -115,7 +308,10 @@ function renderSessions(sessions) {
         totalIn += inT;
         totalOut += outT;
         const pct = inT > 0 ? Math.max(0, Math.round((1 - outT / inT) * 100)) : 0;
-        sessionsList.appendChild(buildRow(s.id, problem, date, inT, outT, pct));
+        const row = buildRow(s.id, problem, date, inT, outT, pct);
+        // Re-apply active state if this was the active session
+        if (String(s.id) === String(activeSessionId)) row.classList.add('active');
+        sessionsList.appendChild(row);
     });
 
     const saved = Math.max(0, totalIn - totalOut);
@@ -127,7 +323,11 @@ function buildRow(id, problem, date, inT, outT, pct) {
     row.className = 'session-row';
     row.dataset.id = id;
 
-    row.addEventListener('click', () => loadSession(id, row));
+    // Click body to load session
+    row.addEventListener('click', (e) => {
+        if (e.target.closest('.session-row-ellipsis') || e.target.closest('.session-row-dropdown')) return;
+        loadSession(id, row, problem);
+    });
 
     // Donut
     const donutWrap = document.createElement('div');
@@ -156,7 +356,6 @@ function buildRow(id, problem, date, inT, outT, pct) {
     meta.appendChild(sav);
     meta.appendChild(dt);
 
-    // Mini bars
     const bars = document.createElement('div');
     bars.className = 'bar-mini-wrap';
     bars.appendChild(buildBarMini('Input', inT, inT, 'in'));
@@ -166,14 +365,54 @@ function buildRow(id, problem, date, inT, outT, pct) {
     body.appendChild(meta);
     body.appendChild(bars);
 
+    // Ellipsis button
+    const ellipsis = document.createElement('button');
+    ellipsis.className = 'session-row-ellipsis';
+    ellipsis.title = 'Session options';
+    ellipsis.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
+
+    // Row dropdown
+    const dropdown = document.createElement('div');
+    dropdown.className = 'session-row-dropdown';
+    dropdown.innerHTML = `
+    <button class="session-row-dropdown-item" data-action="rename">
+      <i class="fa-regular fa-pen-to-square"></i> Rename
+    </button>
+    <div class="session-row-dropdown-divider"></div>
+    <button class="session-row-dropdown-item danger" data-action="delete">
+      <i class="fa-regular fa-trash-can"></i> Delete
+    </button>`;
+
+    ellipsis.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close all other dropdowns first
+        document.querySelectorAll('.session-row-dropdown.open').forEach(dd => dd.classList.remove('open'));
+        dropdown.classList.toggle('open');
+    });
+
+    dropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        if (action === 'rename') {
+            dropdown.classList.remove('open');
+            openRenameModal(id, title.textContent);
+        } else if (action === 'delete') {
+            dropdown.classList.remove('open');
+            openDeleteModal(id);
+        }
+    });
+
     row.appendChild(donutWrap);
     row.appendChild(body);
+    row.appendChild(ellipsis);
+    row.appendChild(dropdown);
     return row;
 }
 
-async function loadSession(id, rowEl) {
+async function loadSession(id, rowEl, name) {
     document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
     rowEl.classList.add('active');
+    setActiveSession(id, name);
 
     try {
         const res = await fetch(`${SESSION_URL}/${id}`, { headers: makeHeaders() });
@@ -198,6 +437,7 @@ form.addEventListener('submit', async (e) => {
     if (!text) return;
 
     document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
+    setActiveSession(null, null);
 
     renderMsg(text, 'user', true);
     appendChatHistory({ type: 'user', text });
@@ -245,7 +485,13 @@ form.addEventListener('submit', async (e) => {
         appendChatHistory({ type: 'handoff', text: handoff });
 
         saveSession(text, context, handoff)
-            .then(() => loadSessions())
+            .then((saved) => {
+                // Auto-set topbar to new session name
+                const ctx = context ?? {};
+                const name = ctx.problem || ctx.conversationSummary || 'New session';
+                setActiveSession(saved?.id, name);
+                loadSessions();
+            })
             .catch((err) => console.error('saveSession:', err));
 
     } catch (err) {
@@ -280,19 +526,16 @@ async function saveSession(rawInput, context, handoffOutput) {
 function renderMsg(text, type, save) {
     const wrap = document.createElement('div');
     wrap.className = `msg ${type}`;
-
     if (type === 'ai') {
         const label = document.createElement('span');
         label.className = 'msg-label';
         label.textContent = 'Briefly';
         wrap.appendChild(label);
     }
-
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
     bubble.textContent = text;
     wrap.appendChild(bubble);
-
     chat.appendChild(wrap);
     if (save) scrollBottom();
     return wrap;
@@ -301,18 +544,14 @@ function renderMsg(text, type, save) {
 function renderLoading(text) {
     const wrap = document.createElement('div');
     wrap.className = 'msg ai';
-
     const label = document.createElement('span');
     label.className = 'msg-label';
     label.textContent = 'Briefly';
-
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
-
     const span = document.createElement('span');
     span.className = 'loading-text loading-dots';
     span.textContent = text;
-
     bubble.appendChild(span);
     wrap.appendChild(label);
     wrap.appendChild(bubble);
@@ -325,62 +564,45 @@ function renderReceipt(handoff, save) {
     const card = document.createElement('div');
     card.className = 'receipt';
 
-    // Topbar
     const topbar = document.createElement('div');
     topbar.className = 'receipt-topbar';
-
     const left = document.createElement('div');
     left.className = 'receipt-left';
-
     const dot = document.createElement('div');
     dot.className = 'receipt-dot';
-
     const label = document.createElement('span');
     label.className = 'receipt-label';
     label.textContent = 'Handoff prompt';
-
     left.appendChild(dot);
     left.appendChild(label);
-
     const tag = document.createElement('span');
     tag.className = 'receipt-tag';
     tag.textContent = 'Ready to paste';
-
     topbar.appendChild(left);
     topbar.appendChild(tag);
 
-    // Body
     const body = document.createElement('div');
     body.className = 'receipt-body';
-
     const pre = document.createElement('pre');
     pre.textContent = handoff;
     body.appendChild(pre);
 
-    // Footer
     const footer = document.createElement('div');
     footer.className = 'receipt-footer';
-
     const hint = document.createElement('span');
     hint.className = 'receipt-footer-hint';
     hint.textContent = 'Drop this into any AI to continue without re-explaining.';
-
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
     copyBtn.className = 'btn-copy';
     copyBtn.textContent = 'Copy handoff';
-
     copyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(handoff).then(() => {
             copyBtn.textContent = 'Copied';
             copyBtn.classList.add('copied');
-            setTimeout(() => {
-                copyBtn.textContent = 'Copy handoff';
-                copyBtn.classList.remove('copied');
-            }, 2000);
+            setTimeout(() => { copyBtn.textContent = 'Copy handoff'; copyBtn.classList.remove('copied'); }, 2000);
         });
     });
-
     footer.appendChild(hint);
     footer.appendChild(copyBtn);
 
@@ -456,9 +678,7 @@ function setLoading(state) {
     input.disabled = state;
 }
 
-function scrollBottom() {
-    chat.scrollTop = chat.scrollHeight;
-}
+function scrollBottom() { chat.scrollTop = chat.scrollHeight; }
 
 input.addEventListener('input', () => {
     input.style.height = 'auto';
