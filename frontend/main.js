@@ -3,6 +3,7 @@ const input = document.querySelector('#input');
 const chat = document.querySelector('#chat');
 const sendBtn = document.querySelector('#send-btn');
 const sidebar = document.querySelector('#sidebar');
+const topbar = document.querySelector('#topbar');
 const sessionsList = document.querySelector('#sessions-list');
 const statSessions = document.querySelector('#stat-sessions');
 const statSaved = document.querySelector('#stat-saved');
@@ -119,10 +120,12 @@ function setActiveSession(id, name) {
     activeSessionName = name;
 
     if (id) {
+        topbar.classList.remove('hidden');
         topbarBrand.classList.add('hidden');
         topbarSessionTitle.classList.add('visible');
         topbarSessionName.textContent = name || 'Session';
     } else {
+        topbar.classList.add('hidden');
         topbarBrand.classList.remove('hidden');
         topbarSessionTitle.classList.remove('visible');
         topbarDropdown.classList.remove('open');

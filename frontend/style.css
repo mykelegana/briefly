@@ -428,6 +428,8 @@ html,body {
   position: relative;
 }
 
+.topbar.hidden { display: none; }
+
 .topbar-btn {
   width: 30px;
   height: 30px;
