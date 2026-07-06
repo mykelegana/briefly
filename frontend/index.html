@@ -140,18 +140,31 @@
       </div>
 
       <main class="feed" id="chat">
-        <div class="feed-welcome">
-          <div class="welcome-icon">
-            <i class="fa-regular fa-comments"></i>
+
+        <!-- Welcome screen -->
+        <div class="welcome-screen" id="welcome-screen">
+          <div class="welcome-logo">
+            <img src="./logo.png" alt="Briefly" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+            <div class="welcome-logo-fallback">B</div>
           </div>
-          <h2>Continue your AI conversation anywhere</h2>
-          <p>Paste a conversation that hit a context limit below. Briefly extracts the key context and generates a handoff prompt you can drop into any AI tool — without re-explaining your entire project.</p>
+          <h1 class="welcome-heading">What context can I bridge for you?</h1>
+          <p class="welcome-sub">Paste a conversation that hit a limit — I'll extract the context so you can continue anywhere.</p>
           <div class="welcome-steps">
-            <div class="step"><span class="step-n">1</span><span>Paste your capped AI conversation</span></div>
-            <div class="step"><span class="step-n">2</span><span>Briefly extracts context and state</span></div>
-            <div class="step"><span class="step-n">3</span><span>Copy the handoff prompt and continue</span></div>
+            <div class="wstep">
+              <span class="wstep-icon"><i class="fa-regular fa-paste"></i></span>
+              <div><strong>Paste</strong> your capped AI conversation</div>
+            </div>
+            <div class="wstep">
+              <span class="wstep-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+              <div><strong>Extract</strong> — Briefly pulls out context, stack, problem, and state</div>
+            </div>
+            <div class="wstep">
+              <span class="wstep-icon"><i class="fa-regular fa-copy"></i></span>
+              <div><strong>Handoff</strong> — copy the prompt and drop into any AI tool</div>
+            </div>
           </div>
         </div>
+
       </main>
 
       <div class="compose-wrap">
