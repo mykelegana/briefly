@@ -44,12 +44,18 @@
 
   <div class="shell">
 
-    <!-- ── Sidebar collapsed logo (visible when rail is hidden) ── -->
-    <div class="rail-collapsed-logo" id="rail-collapsed-logo" title="Open sessions">
-      <div class="rcl-mark">
-        <img src="./logo.png" alt="Briefly" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
-        <span class="rcl-fallback">B</span>
-      </div>
+    <!-- ── Sidebar collapsed rail (visible when rail is hidden) ── -->
+    <div class="rail-collapsed" id="rail-collapsed">
+      <button class="rc-btn" id="rail-collapsed-expand" title="Open sidebar">
+        <i class="fa-solid fa-angles-right"></i>
+      </button>
+      <button class="rc-btn" id="rail-collapsed-new" title="New context">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+      <div class="rc-divider"></div>
+      <button class="rc-btn" id="rail-collapsed-sessions" title="Sessions">
+        <i class="fa-regular fa-comments"></i>
+      </button>
     </div>
 
     <!-- ── Sidebar ── -->
@@ -105,9 +111,6 @@
     <div class="workspace">
 
       <div class="topbar hidden" id="topbar">
-        <button class="topbar-btn" id="sidebar-toggle-open" title="Open sidebar">
-          <i class="fa-solid fa-bars"></i>
-        </button>
 
         <!-- Session title (shown when a session is active) -->
         <div class="topbar-session-title" id="topbar-session-title">
@@ -147,7 +150,7 @@
             <img src="./logo.png" alt="Briefly" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
             <div class="welcome-logo-fallback">B</div>
           </div>
-          <h1 class="welcome-heading">What context can I bridge for you?</h1>
+          <h1 class="welcome-heading">What context can I brief for you?</h1>
           <p class="welcome-sub">Paste a conversation that hit a limit — I'll extract the context so you can continue anywhere.</p>
           <div class="welcome-steps">
             <div class="wstep">

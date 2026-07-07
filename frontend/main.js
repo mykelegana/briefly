@@ -21,6 +21,14 @@ let activeSessionId = null;
 let activeSessionName = null;
 let allSessions = [];
 
+// Snapshot of the original welcome screen markup so we can restore it exactly
+// (used by "New context" instead of building a separate/duplicate welcome view).
+const welcomeScreenTemplate = document.querySelector('#welcome-screen').outerHTML;
+
+function showWelcomeScreen() {
+    chat.innerHTML = welcomeScreenTemplate;
+}
+
 // ── Token ─────────────────────────────────────────────────────────────────────
 
 function getToken() {
@@ -67,42 +75,33 @@ function restoreChat() {
 
 // ── Sidebar collapse / expand ─────────────────────────────────────────────────
 
-const collapsedLogo = document.querySelector('#rail-collapsed-logo');
+const railCollapsed = document.querySelector('#rail-collapsed');
 
 function closeSidebar() {
     sidebar.classList.add('hidden');
-    collapsedLogo.classList.add('visible');
+    railCollapsed.classList.add('visible');
 }
 
 function openSidebar() {
     sidebar.classList.remove('hidden');
-    collapsedLogo.classList.remove('visible');
+    railCollapsed.classList.remove('visible');
 }
 
 document.querySelector('#sidebar-toggle').addEventListener('click', closeSidebar);
-document.querySelector('#sidebar-toggle-open').addEventListener('click', openSidebar);
-collapsedLogo.addEventListener('click', openSidebar);
+document.querySelector('#rail-collapsed-expand').addEventListener('click', openSidebar);
+document.querySelector('#rail-collapsed-sessions').addEventListener('click', openSidebar);
+document.querySelector('#rail-collapsed-new').addEventListener('click', () => {
+    document.querySelector('#btn-new-context').click();
+});
 
 // ── New context ───────────────────────────────────────────────────────────────
 
 document.querySelector('#btn-new-context').addEventListener('click', () => {
     // Clear chat and history — start fresh
-    chat.innerHTML = '';
     try { localStorage.removeItem(CHAT_KEY); } catch { }
     setActiveSession(null, null);
-    // Show welcome screen again
-    const welcome = document.createElement('div');
-    welcome.className = 'feed-welcome';
-    welcome.innerHTML = `
-    <div class="welcome-icon"><i class="fa-regular fa-comments"></i></div>
-    <h2>Continue your AI conversation anywhere</h2>
-    <p>Paste a conversation that hit a context limit below. Briefly extracts the key context and generates a handoff prompt you can drop into any AI tool — without re-explaining your entire project.</p>
-    <div class="welcome-steps">
-      <div class="step"><span class="step-n">1</span><span>Paste your capped AI conversation</span></div>
-      <div class="step"><span class="step-n">2</span><span>Briefly extracts context and state</span></div>
-      <div class="step"><span class="step-n">3</span><span>Copy the handoff prompt and continue</span></div>
-    </div>`;
-    chat.appendChild(welcome);
+    // Restore the original welcome screen (same one shown on first load)
+    showWelcomeScreen();
     document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
     input.focus();
 });
@@ -243,9 +242,9 @@ async function doDeleteSession(id) {
 
     // If deleted session was active, go back to blank state
     if (activeSessionId === String(id) || activeSessionId === id) {
-        chat.innerHTML = '';
         try { localStorage.removeItem(CHAT_KEY); } catch { }
         setActiveSession(null, null);
+        showWelcomeScreen();
     }
 
     // Reload sessions to update stats
@@ -441,6 +440,9 @@ form.addEventListener('submit', async (e) => {
 
     document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
     setActiveSession(null, null);
+
+    // Remove the welcome screen once a conversation starts
+    if (chat.querySelector('#welcome-screen')) chat.innerHTML = '';
 
     renderMsg(text, 'user', true);
     appendChatHistory({ type: 'user', text });

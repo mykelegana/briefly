@@ -33,6 +33,7 @@
   --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
   --rail-w: 260px;
+  --rail-collapsed-w: 52px;
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────── */
@@ -53,50 +54,58 @@ html,body {
   position: relative;
 }
 
-/* ── Collapsed logo (visible when sidebar hidden) ────────────────────────── */
-.rail-collapsed-logo {
-  position: absolute;
-  top: 11px;
-  left: 16px;
-  z-index: 30;
-  display: none;
-  cursor: e-resize;
+/* ── Collapsed rail (visible when sidebar hidden) ────────────────────────── */
+/* Mirrors the "mini rail" pattern used by Claude's collapsed sidebar: a thin
+   strip of icon buttons that stays available so the sidebar's core actions
+   (expand, new context, sessions) are never fully hidden. */
+.rail-collapsed {
+  width: 0;
+  flex-shrink: 0;
+  background: var(--rail-bg);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  padding: 0;
+  gap: 6px;
+  z-index: 20;
+  transition: width 0.2s cubic-bezier(0.4,0,0.2,1), padding 0.2s ease;
 }
 
-.rail-collapsed-logo.visible {
-  display: block;
+.rail-collapsed.visible {
+  width: var(--rail-collapsed-w);
+  padding: 12px 0;
 }
 
-.rcl-mark {
-  width: 32px;
-  height: 32px;
+.rc-btn {
+  width: 34px;
+  height: 34px;
   border-radius: 8px;
-  background: var(--accent);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  transition: opacity 0.15s, transform 0.15s;
-  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.rcl-mark:hover {
-  opacity: 0;
+.rc-btn:hover {
+  color: var(--text-1);
+  background: var(--surface-2);
   border-color: var(--line-2);
 }
 
-.rcl-mark img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.rcl-fallback {
-  display: none;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
+.rc-divider {
+  width: 22px;
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
+  flex-shrink: 0;
 }
 
 /* ── Rail ────────────────────────────────────────────────────────────────── */
@@ -416,7 +425,8 @@ html,body {
   overflow: hidden;
 }
 
-/* Topbar */
+/* Topbar — only shown when a session is active. The sidebar-open control
+   lives in the collapsed rail (.rail-collapsed), not here. */
 .topbar {
   display: flex;
   align-items: center;
@@ -556,66 +566,18 @@ html,body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 28px 24px 12px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
   scrollbar-width: thin;
   scrollbar-color: var(--line-2) transparent;
-  max-width: 860px;
-  width: 100%;
-  margin: 0 auto;
-  align-self: stretch;
 }
 
 .feed::-webkit-scrollbar { width: 4px; }
 .feed::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
 
-/* Welcome */
-.feed-welcome {
-  margin: auto 0;
-  padding: 24px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 520px;
-}
-
-.welcome-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--surface-3);
-  border: 1px solid var(--line-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-2);
-  font-size: 18px;
-}
-
-.feed-welcome h2 { font-size: 18px; font-weight: 600; color: var(--text-1); line-height: 1.35; letter-spacing: -0.01em; }
-.feed-welcome p { font-size: 14px; color: var(--text-2); line-height: 1.65; }
-
-.welcome-steps { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
-.step { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
-.step-n {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--surface-3);
-  border: 1px solid var(--line-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-2);
-  flex-shrink: 0;
-}
-
 /* Messages */
-.msg { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.msg { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; max-width: 860px; width: 100%; margin: 0 auto; padding: 0 24px; }
 .msg.user { align-items: flex-end; }
 .msg.ai   { align-items: flex-start; }
 
@@ -632,20 +594,26 @@ html,body {
 .msg.user .msg-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
 .msg.ai .msg-bubble { background: var(--surface-2); color: var(--text-1); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
 
+.msg:first-child { margin-top: 28px; }
+.msg:last-child { margin-bottom: 12px; }
+
 .loading-dots::after { content: ''; animation: dots 1.2s steps(4,end) infinite; }
 @keyframes dots { 0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'} }
 
 /* Receipt */
 .receipt {
+  max-width: 860px;
   width: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
   flex-shrink: 0;
-  background: var(--surface-2);
-  border: 1px solid var(--line-2);
-  border-radius: 10px;
-  overflow: hidden;
+}
+
+.receipt > * { background: var(--surface-2); }
+
+.receipt {
   display: flex;
   flex-direction: column;
-  max-height: 440px;
 }
 
 .receipt-topbar {
@@ -654,7 +622,9 @@ html,body {
   justify-content: space-between;
   padding: 10px 14px;
   background: var(--surface-3);
-  border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line-2);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
   flex-shrink: 0;
   gap: 12px;
 }
@@ -667,12 +637,15 @@ html,body {
 .receipt-body {
   flex: 1;
   min-height: 0;
+  max-height: 400px;
   overflow-y: auto;
   overflow-x: auto;
   padding: 16px 18px;
   scrollbar-width: thin;
   scrollbar-color: var(--line-2) transparent;
   border-left: 3px solid var(--green);
+  border-right: 1px solid var(--line-2);
+  background: var(--surface-2);
 }
 
 .receipt-body pre { font-family: var(--mono); font-size: 12px; line-height: 1.8; color: #CBD5E1; white-space: pre-wrap; word-break: break-word; margin: 0; }
@@ -684,7 +657,9 @@ html,body {
   gap: 12px;
   padding: 10px 14px;
   background: var(--surface-3);
+  border: 1px solid var(--line-2);
   border-top: 1px solid var(--line);
+  border-radius: 0 0 10px 10px;
   flex-shrink: 0;
 }
 
@@ -901,24 +876,6 @@ html,body {
 
 .modal-btn-danger:hover { opacity: 0.85; }
 
-/* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 680px) {
-  .rail { position: fixed; top: 0; left: 0; height: 100%; z-index: 50; }
-  .rail.hidden { transform: translateX(-100%); width: var(--rail-w); opacity: 1; pointer-events: none; }
-  .topbar-hint { display: none; }
-}
-
-/* ── Feed ────────────────────────────────────────────────────────────────── */
-.feed {
-  flex: 1; min-height: 0; overflow-y: auto;
-  padding: 0;
-  display: flex; flex-direction: column;
-  scrollbar-width: thin; scrollbar-color: var(--line-2) transparent;
-}
-
-.feed::-webkit-scrollbar { width: 4px; }
-.feed::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
-
 /* ── Welcome screen ──────────────────────────────────────────────────────── */
 .welcome-screen {
   flex: 1;
@@ -1002,7 +959,15 @@ html,body {
   justify-content: center;
   flex-shrink: 0;
   font-size: 13px;
-  background-image: linear-gradient(to right, #02bffc, #4839e6);;
+  background-image: linear-gradient(to right, #02bffc, #4839e6);
   color: #fff;
   border: none;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 680px) {
+  .rail { position: fixed; top: 0; left: 0; height: 100%; z-index: 50; }
+  .rail.hidden { transform: translateX(-100%); width: var(--rail-w); opacity: 1; pointer-events: none; }
+  .rail-collapsed { position: fixed; top: 0; left: 0; height: 100%; z-index: 40; }
+  .topbar-hint { display: none; }
 }
