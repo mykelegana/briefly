@@ -3,7 +3,7 @@ const input = document.querySelector('#input');
 const chat = document.querySelector('#chat');
 const sendBtn = document.querySelector('#send-btn');
 const sidebar = document.querySelector('#sidebar');
-const sidebarToggle = document.querySelector('#sidebar-toggle');
+const topbar = document.querySelector('#topbar');
 const sessionsList = document.querySelector('#sessions-list');
 const statSessions = document.querySelector('#stat-sessions');
 const statSaved = document.querySelector('#stat-saved');
@@ -12,75 +12,284 @@ const API = 'http://localhost:3000';
 const EXTRACT_URL = `${API}/extract`;
 const HANDOFF_URL = `${API}/handoff/generate`;
 const SESSION_URL = `${API}/sessions`;
-const TOKEN_KEY = 'briefly_session_token';
 
-// ── Token helpers (localStorage — no cookie issues) ───────────────────────────
+const TOKEN_KEY = 'briefly_session_token';
+const CHAT_KEY = 'briefly_chat_history';
+
+// ── Active session state ──────────────────────────────────────────────────────
+let activeSessionId = null;
+let activeSessionName = null;
+let allSessions = [];
+
+// Snapshot of the original welcome screen markup so we can restore it exactly
+// (used by "New context" instead of building a separate/duplicate welcome view).
+const welcomeScreenTemplate = document.querySelector('#welcome-screen').outerHTML;
+
+function showWelcomeScreen() {
+    chat.innerHTML = welcomeScreenTemplate;
+}
+
+// ── Token ─────────────────────────────────────────────────────────────────────
 
 function getToken() {
-    let token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-        // Generate UUID on the frontend — no need to wait for server
-        token = crypto.randomUUID();
-        localStorage.setItem(TOKEN_KEY, token);
-        console.log('New token generated:', token);
-    }
-    return token;
+    let t = localStorage.getItem(TOKEN_KEY);
+    if (!t) { t = crypto.randomUUID(); localStorage.setItem(TOKEN_KEY, t); }
+    return t;
 }
 
-function saveToken(token) {
-    if (token) {
-        localStorage.setItem(TOKEN_KEY, token);
-        console.log('Token saved to localStorage:', token);
-    }
-}
-
-// Build headers for every request — always includes token if we have one
 function makeHeaders(withBody = false) {
-    const headers = { 'x-session-token': getToken() }; // always included
-    if (withBody) headers['Content-Type'] = 'application/json';
-    return headers;
+    const h = { 'x-session-token': getToken() };
+    if (withBody) h['Content-Type'] = 'application/json';
+    return h;
 }
 
-// After every response — check if server sent back a new token
 function extractToken(res) {
-    const token = res.headers.get('x-session-token');
-    if (token) saveToken(token);
+    const t = res.headers.get('x-session-token');
+    if (t) localStorage.setItem(TOKEN_KEY, t);
 }
 
-// ── Sidebar toggle ────────────────────────────────────────────────────────────
+// ── Chat persistence ──────────────────────────────────────────────────────────
 
-sidebarToggle.addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
+function getChatHistory() {
+    try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function appendChatHistory(entry) {
+    const h = getChatHistory();
+    h.push(entry);
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify(h)); } catch { }
+}
+
+function restoreChat() {
+    const history = getChatHistory();
+    if (!history.length) return;
+    chat.innerHTML = '';
+    history.forEach((e) => {
+        if (e.type === 'user') renderMsg(e.text, 'user', false);
+        else if (e.type === 'ai') renderMsg(e.text, 'ai', false);
+        else if (e.type === 'handoff') renderReceipt(e.text, false);
+    });
+    scrollBottom();
+}
+
+// ── Sidebar collapse / expand ─────────────────────────────────────────────────
+
+const railCollapsed = document.querySelector('#rail-collapsed');
+
+function closeSidebar() {
+    sidebar.classList.add('hidden');
+    railCollapsed.classList.add('visible');
+}
+
+function openSidebar() {
+    sidebar.classList.remove('hidden');
+    railCollapsed.classList.remove('visible');
+}
+
+document.querySelector('#sidebar-toggle').addEventListener('click', closeSidebar);
+document.querySelector('#rail-collapsed-expand').addEventListener('click', openSidebar);
+document.querySelector('#rail-collapsed-sessions').addEventListener('click', openSidebar);
+document.querySelector('#rail-collapsed-new').addEventListener('click', () => {
+    document.querySelector('#btn-new-context').click();
 });
 
-// ── Load sessions on startup ──────────────────────────────────────────────────
+// ── New context ───────────────────────────────────────────────────────────────
+
+document.querySelector('#btn-new-context').addEventListener('click', () => {
+    // Clear chat and history — start fresh
+    try { localStorage.removeItem(CHAT_KEY); } catch { }
+    setActiveSession(null, null);
+    // Restore the original welcome screen (same one shown on first load)
+    showWelcomeScreen();
+    document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
+    input.focus();
+});
+
+// ── Topbar session title ──────────────────────────────────────────────────────
+
+const topbarBrand = document.querySelector('#topbar-brand');
+const topbarSessionTitle = document.querySelector('#topbar-session-title');
+const topbarSessionName = document.querySelector('#topbar-session-name');
+const topbarDropdown = document.querySelector('#topbar-dropdown');
+const topbarMenuBtn = document.querySelector('#topbar-session-menu-btn');
+
+function setActiveSession(id, name) {
+    activeSessionId = id;
+    activeSessionName = name;
+
+    if (id) {
+        topbar.classList.remove('hidden');
+        topbarBrand.classList.add('hidden');
+        topbarSessionTitle.classList.add('visible');
+        topbarSessionName.textContent = name || 'Session';
+    } else {
+        topbar.classList.add('hidden');
+        topbarBrand.classList.remove('hidden');
+        topbarSessionTitle.classList.remove('visible');
+        topbarDropdown.classList.remove('open');
+    }
+}
+
+topbarMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    topbarDropdown.classList.toggle('open');
+});
+
+document.querySelector('#topbar-rename').addEventListener('click', () => {
+    topbarDropdown.classList.remove('open');
+    if (activeSessionId) openRenameModal(activeSessionId, activeSessionName);
+});
+
+document.querySelector('#topbar-delete').addEventListener('click', () => {
+    topbarDropdown.classList.remove('open');
+    if (activeSessionId) openDeleteModal(activeSessionId);
+});
+
+// ── Rename modal ──────────────────────────────────────────────────────────────
+
+const renameOverlay = document.querySelector('#rename-overlay');
+const renameInput = document.querySelector('#rename-input');
+const renameConfirm = document.querySelector('#rename-confirm');
+let renamingId = null;
+
+function openRenameModal(id, currentName) {
+    renamingId = id;
+    renameInput.value = currentName || '';
+    renameOverlay.classList.add('open');
+    setTimeout(() => { renameInput.focus(); renameInput.select(); }, 50);
+}
+
+function closeRenameModal() {
+    renameOverlay.classList.remove('open');
+    renamingId = null;
+}
+
+document.querySelector('#rename-cancel').addEventListener('click', closeRenameModal);
+document.querySelector('#rename-cancel-x').addEventListener('click', closeRenameModal);
+
+renameConfirm.addEventListener('click', async () => {
+    const newName = renameInput.value.trim();
+    if (!newName || !renamingId) return;
+    await doRenameSession(renamingId, newName);
+    closeRenameModal();
+});
+
+renameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') renameConfirm.click();
+    if (e.key === 'Escape') closeRenameModal();
+});
+
+async function doRenameSession(id, newName) {
+    // Optimistic UI update
+    const row = document.querySelector(`.session-row[data-id="${id}"]`);
+    if (row) {
+        const titleEl = row.querySelector('.session-row-title');
+        if (titleEl) titleEl.textContent = newName;
+    }
+    if (activeSessionId === id) {
+        activeSessionName = newName;
+        topbarSessionName.textContent = newName;
+    }
+    // Update in allSessions
+    const s = allSessions.find(s => String(s.id) === String(id));
+    if (s) s._name = newName;
+
+    // NOTE: backend rename endpoint not yet implemented — update locally only
+    // When backend supports PATCH /sessions/:id, call it here
+    console.log('Renamed session', id, 'to', newName);
+}
+
+// ── Delete modal ──────────────────────────────────────────────────────────────
+
+const deleteOverlay = document.querySelector('#delete-overlay');
+const deleteConfirm = document.querySelector('#delete-confirm');
+let deletingId = null;
+
+function openDeleteModal(id) {
+    deletingId = id;
+    deleteOverlay.classList.add('open');
+}
+
+function closeDeleteModal() {
+    deleteOverlay.classList.remove('open');
+    deletingId = null;
+}
+
+document.querySelector('#delete-cancel').addEventListener('click', closeDeleteModal);
+document.querySelector('#delete-cancel-x').addEventListener('click', closeDeleteModal);
+
+deleteConfirm.addEventListener('click', async () => {
+    if (!deletingId) return;
+    await doDeleteSession(deletingId);
+    closeDeleteModal();
+});
+
+async function doDeleteSession(id) {
+    try {
+        const res = await fetch(`${SESSION_URL}/${id}`, {
+            method: 'DELETE',
+            headers: makeHeaders(),
+        });
+        extractToken(res);
+    } catch (err) {
+        console.warn('Delete failed:', err);
+    }
+
+    // Remove row from sidebar
+    const row = document.querySelector(`.session-row[data-id="${id}"]`);
+    if (row) row.remove();
+
+    // If deleted session was active, go back to blank state
+    if (activeSessionId === String(id) || activeSessionId === id) {
+        try { localStorage.removeItem(CHAT_KEY); } catch { }
+        setActiveSession(null, null);
+        showWelcomeScreen();
+    }
+
+    // Reload sessions to update stats
+    loadSessions();
+}
+
+// ── Close dropdowns when clicking outside ─────────────────────────────────────
+
+document.addEventListener('click', (e) => {
+    // Close topbar dropdown
+    if (!topbarMenuBtn.contains(e.target) && !topbarDropdown.contains(e.target)) {
+        topbarDropdown.classList.remove('open');
+    }
+    // Close any open session row dropdowns
+    document.querySelectorAll('.session-row-dropdown.open').forEach(dd => {
+        dd.classList.remove('open');
+    });
+    // Close modals on overlay click
+    if (e.target === renameOverlay) closeRenameModal();
+    if (e.target === deleteOverlay) closeDeleteModal();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+restoreChat();
+loadSessions();
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
 
 async function loadSessions() {
     try {
-        const res = await fetch(SESSION_URL, {
-            headers: makeHeaders(),
-        });
-        extractToken(res); // always capture token from response
-
-        if (!res.ok) {
-            console.error('GET /sessions failed:', res.status);
-            return;
-        }
-
+        const res = await fetch(SESSION_URL, { headers: makeHeaders() });
+        extractToken(res);
+        if (!res.ok) return;
         const sessions = await res.json();
-        console.log('Sessions loaded:', sessions.length, sessions);
+        allSessions = sessions;
         renderSessions(sessions);
     } catch (err) {
-        console.warn('Could not load sessions:', err);
+        console.warn('loadSessions:', err);
     }
 }
-loadSessions();
-
-// ── Render sessions ───────────────────────────────────────────────────────────
 
 function renderSessions(sessions) {
-    if (!sessions || sessions.length === 0) {
-        sessionsList.innerHTML = `<div class="sessions-empty">No sessions yet.<br/>Paste a conversation to start.</div>`;
+    if (!sessions?.length) {
+        sessionsList.innerHTML = '<div class="session-nav-empty">No sessions yet. Paste a conversation to start.</div>';
         statSessions.textContent = '0';
         statSaved.textContent = '0';
         return;
@@ -89,142 +298,137 @@ function renderSessions(sessions) {
     statSessions.textContent = sessions.length;
     sessionsList.innerHTML = '';
 
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
+    let totalIn = 0, totalOut = 0;
 
-    sessions.forEach((session) => {
-        const context = session.context ?? {};
-        const problem = context.problem ?? context.conversationSummary ?? 'Session';
-        const date = formatDate(session.createdAt);
-
-        // 1 token ≈ 4 characters
-        const inputTokens = session.rawInput
-            ? Math.round(session.rawInput.length / 4)
-            : 0;
-        const outputTokens = session.handoff
-            ? Math.round(session.handoff.length / 4)
-            : Math.round(JSON.stringify(context).length / 4);
-
-        totalInputTokens += inputTokens;
-        totalOutputTokens += outputTokens;
-
-        const savedPct = inputTokens > 0
-            ? Math.max(0, Math.round((1 - outputTokens / inputTokens) * 100))
-            : 0;
-
-        sessionsList.appendChild(
-            buildSessionItem(problem, date, inputTokens, outputTokens, savedPct),
-        );
+    sessions.forEach((s) => {
+        const ctx = s.context ?? {};
+        const problem = s._name || ctx.problem || ctx.conversationSummary || 'Session';
+        const date = fmtDate(s.createdAt);
+        const inT = s.rawInput ? Math.round(s.rawInput.length / 4) : 0;
+        const outT = s.handoff ? Math.round(s.handoff.length / 4)
+            : Math.round(JSON.stringify(ctx).length / 4);
+        totalIn += inT;
+        totalOut += outT;
+        const pct = inT > 0 ? Math.max(0, Math.round((1 - outT / inT) * 100)) : 0;
+        const row = buildRow(s.id, problem, date, inT, outT, pct);
+        // Re-apply active state if this was the active session
+        if (String(s.id) === String(activeSessionId)) row.classList.add('active');
+        sessionsList.appendChild(row);
     });
 
-    const totalSaved = Math.max(0, totalInputTokens - totalOutputTokens);
-    statSaved.textContent = totalSaved > 1000
-        ? `${(totalSaved / 1000).toFixed(1)}k`
-        : String(totalSaved);
+    const saved = Math.max(0, totalIn - totalOut);
+    statSaved.textContent = saved > 1000 ? `${(saved / 1000).toFixed(1)}k` : String(saved);
 }
 
-// ── Session item UI ───────────────────────────────────────────────────────────
-
-function buildSessionItem(problem, date, inputTokens, outputTokens, savedPct) {
-    const item = document.createElement('div');
-    item.className = 'session-item';
-
-    const top = document.createElement('div');
-    top.className = 'session-top';
-
-    const problemEl = document.createElement('span');
-    problemEl.className = 'session-problem';
-    problemEl.textContent = problem;
-
-    const dateEl = document.createElement('span');
-    dateEl.className = 'session-date';
-    dateEl.textContent = date;
-
-    top.appendChild(problemEl);
-    top.appendChild(dateEl);
-
-    const savings = document.createElement('div');
-    savings.className = 'session-savings';
-    savings.appendChild(buildDonut(savedPct));
-
-    const info = document.createElement('div');
-    info.className = 'savings-info';
-
-    const pct = document.createElement('span');
-    pct.className = 'savings-pct';
-    pct.textContent = `${savedPct}% saved`;
-
-    const barWrap = document.createElement('div');
-    barWrap.className = 'savings-bar-wrap';
-    barWrap.appendChild(buildBar('Input', inputTokens, inputTokens, 'input'));
-    barWrap.appendChild(buildBar('Output', outputTokens, inputTokens, 'output'));
-
-    info.appendChild(pct);
-    info.appendChild(barWrap);
-    savings.appendChild(info);
-
-    item.appendChild(top);
-    item.appendChild(savings);
-    return item;
-}
-
-function buildDonut(pct) {
-    const size = 40;
-    const r = 15;
-    const circ = 2 * Math.PI * r;
-    const filled = Math.max(0, Math.min(100, pct));
-    const offset = circ - (filled / 100) * circ;
-
-    const wrap = document.createElement('div');
-    wrap.className = 'donut-wrap';
-    wrap.innerHTML = `
-    <svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle class="donut-track" cx="${size / 2}" cy="${size / 2}" r="${r}"/>
-      <circle class="donut-fill"
-        cx="${size / 2}" cy="${size / 2}" r="${r}"
-        stroke-dasharray="${circ}"
-        stroke-dashoffset="${circ}"
-        data-offset="${offset}"/>
-      <text x="${size / 2}" y="${size / 2 + 4}" text-anchor="middle"
-        font-size="8" font-family="Inter,sans-serif"
-        font-weight="600" fill="#10B981">${filled}%</text>
-    </svg>`;
-
-    requestAnimationFrame(() => {
-        const fill = wrap.querySelector('.donut-fill');
-        if (fill) setTimeout(() => { fill.style.strokeDashoffset = fill.dataset.offset; }, 50);
-    });
-
-    return wrap;
-}
-
-function buildBar(label, value, max, type) {
-    const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-    const display = value > 1000 ? `${(value / 1000).toFixed(1)}k` : String(value);
+function buildRow(id, problem, date, inT, outT, pct) {
     const row = document.createElement('div');
-    row.className = 'savings-bar-row';
-    row.innerHTML = `
-    <span class="bar-label">${label}</span>
-    <div class="bar-track">
-      <div class="bar-fill ${type}" style="width:0%" data-pct="${pct}%"></div>
-    </div>
-    <span class="bar-count">${display}</span>`;
-    requestAnimationFrame(() => {
-        const fill = row.querySelector('.bar-fill');
-        if (fill) setTimeout(() => { fill.style.width = fill.dataset.pct; }, 50);
+    row.className = 'session-row';
+    row.dataset.id = id;
+
+    // Click body to load session
+    row.addEventListener('click', (e) => {
+        if (e.target.closest('.session-row-ellipsis') || e.target.closest('.session-row-dropdown')) return;
+        loadSession(id, row, problem);
     });
+
+    // Donut
+    const donutWrap = document.createElement('div');
+    donutWrap.className = 'session-row-donut';
+    donutWrap.appendChild(buildDonut(pct, 34));
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'session-row-body';
+
+    const title = document.createElement('div');
+    title.className = 'session-row-title';
+    title.textContent = problem;
+
+    const meta = document.createElement('div');
+    meta.className = 'session-row-meta';
+
+    const sav = document.createElement('span');
+    sav.className = 'session-row-savings';
+    sav.textContent = `${pct}% saved`;
+
+    const dt = document.createElement('span');
+    dt.className = 'session-row-date';
+    dt.textContent = date;
+
+    meta.appendChild(sav);
+    meta.appendChild(dt);
+
+    const bars = document.createElement('div');
+    bars.className = 'bar-mini-wrap';
+    bars.appendChild(buildBarMini('Input', inT, inT, 'in'));
+    bars.appendChild(buildBarMini('Output', outT, inT, 'out'));
+
+    body.appendChild(title);
+    body.appendChild(meta);
+    body.appendChild(bars);
+
+    // Ellipsis button
+    const ellipsis = document.createElement('button');
+    ellipsis.className = 'session-row-ellipsis';
+    ellipsis.title = 'Session options';
+    ellipsis.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
+
+    // Row dropdown
+    const dropdown = document.createElement('div');
+    dropdown.className = 'session-row-dropdown';
+    dropdown.innerHTML = `
+    <button class="session-row-dropdown-item" data-action="rename">
+      <i class="fa-regular fa-pen-to-square"></i> Rename
+    </button>
+    <div class="session-row-dropdown-divider"></div>
+    <button class="session-row-dropdown-item danger" data-action="delete">
+      <i class="fa-regular fa-trash-can"></i> Delete
+    </button>`;
+
+    ellipsis.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close all other dropdowns first
+        document.querySelectorAll('.session-row-dropdown.open').forEach(dd => dd.classList.remove('open'));
+        dropdown.classList.toggle('open');
+    });
+
+    dropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        if (action === 'rename') {
+            dropdown.classList.remove('open');
+            openRenameModal(id, title.textContent);
+        } else if (action === 'delete') {
+            dropdown.classList.remove('open');
+            openDeleteModal(id);
+        }
+    });
+
+    row.appendChild(donutWrap);
+    row.appendChild(body);
+    row.appendChild(ellipsis);
+    row.appendChild(dropdown);
     return row;
 }
 
-function formatDate(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const diffH = Math.floor((Date.now() - d) / 3600000);
-    if (diffH < 1) return 'just now';
-    if (diffH < 24) return `${diffH}h ago`;
-    const diffD = Math.floor(diffH / 24);
-    if (diffD < 7) return `${diffD}d ago`;
-    return d.toLocaleDateString();
+async function loadSession(id, rowEl, name) {
+    document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
+    rowEl.classList.add('active');
+    setActiveSession(id, name);
+
+    try {
+        const res = await fetch(`${SESSION_URL}/${id}`, { headers: makeHeaders() });
+        extractToken(res);
+        if (!res.ok) return;
+        const session = await res.json();
+
+        chat.innerHTML = '';
+        if (session.rawInput) renderMsg(session.rawInput, 'user', false);
+        if (session.handoff) renderReceipt(session.handoff, false);
+        scrollBottom();
+    } catch (err) {
+        console.warn('loadSession:', err);
+    }
 }
 
 // ── Submit ────────────────────────────────────────────────────────────────────
@@ -234,15 +438,22 @@ form.addEventListener('submit', async (e) => {
     const text = input.value.trim();
     if (!text) return;
 
-    addMessage(text, 'user');
+    document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
+    setActiveSession(null, null);
+
+    // Remove the welcome screen once a conversation starts
+    if (chat.querySelector('#welcome-screen')) chat.innerHTML = '';
+
+    renderMsg(text, 'user', true);
+    appendChatHistory({ type: 'user', text });
+
     input.value = '';
     input.style.height = 'auto';
     setLoading(true);
 
-    const loading = addLoadingMessage('Extracting context');
+    const loading = renderLoading('Extracting context');
 
     try {
-        // 1. Extract
         const extractRes = await fetch(EXTRACT_URL, {
             method: 'POST',
             headers: makeHeaders(true),
@@ -256,10 +467,9 @@ form.addEventListener('submit', async (e) => {
         }
 
         const context = await extractRes.json();
-        const loadingText = loading.querySelector('.loading-text');
-        if (loadingText) loadingText.textContent = 'Generating handoff prompt';
+        const lt = loading.querySelector('.loading-text');
+        if (lt) lt.textContent = 'Generating handoff';
 
-        // 2. Handoff
         const handoffRes = await fetch(HANDOFF_URL, {
             method: 'POST',
             headers: makeHeaders(true),
@@ -276,128 +486,196 @@ form.addEventListener('submit', async (e) => {
         if (handoff.startsWith('"')) handoff = JSON.parse(handoff);
 
         loading.remove();
-        addHandoffCard(handoff);
+        renderReceipt(handoff, true);
+        appendChatHistory({ type: 'handoff', text: handoff });
 
-        // 3. Save session then reload sidebar
         saveSession(text, context, handoff)
-            .then(() => {
-                console.log('Session saved — reloading sidebar');
+            .then((saved) => {
+                // Auto-set topbar to new session name
+                const ctx = context ?? {};
+                const name = ctx.problem || ctx.conversationSummary || 'New session';
+                setActiveSession(saved?.id, name);
                 loadSessions();
             })
-            .catch((err) => console.error('Session save failed:', err));
+            .catch((err) => console.error('saveSession:', err));
 
     } catch (err) {
         loading.remove();
-        addMessage(`Something went wrong: ${err.message}`, 'ai');
+        const msg = `Something went wrong: ${err.message}`;
+        renderMsg(msg, 'ai', true);
+        appendChatHistory({ type: 'ai', text: msg });
         console.error(err);
     } finally {
         setLoading(false);
     }
 });
 
-// ── Save session ──────────────────────────────────────────────────────────────
+// ── Save ──────────────────────────────────────────────────────────────────────
 
 async function saveSession(rawInput, context, handoffOutput) {
-    console.log('Saving session with token:', getToken());
-    console.log('Payload:', { rawInput: rawInput?.slice(0, 50), context, handoffOutput: handoffOutput?.slice(0, 50) });
-
     const res = await fetch(SESSION_URL, {
         method: 'POST',
         headers: makeHeaders(true),
         body: JSON.stringify({ rawInput, context, handoffOutput }),
     });
     extractToken(res);
-
-    const body = await res.json().catch(() => null);
-    console.log('Save response:', res.status, body);
-
-    if (!res.ok) throw new Error(body?.message ?? 'Session save failed');
-    return body;
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(err.message ?? 'Session save failed');
+    }
+    return res.json();
 }
 
-// ── UI helpers ────────────────────────────────────────────────────────────────
+// ── Render helpers ────────────────────────────────────────────────────────────
 
-function addMessage(text, type) {
-    const div = document.createElement('div');
-    div.className = `message ${type}`;
+function renderMsg(text, type, save) {
+    const wrap = document.createElement('div');
+    wrap.className = `msg ${type}`;
     if (type === 'ai') {
         const label = document.createElement('span');
-        label.className = 'ai-label';
+        label.className = 'msg-label';
         label.textContent = 'Briefly';
-        div.appendChild(label);
+        wrap.appendChild(label);
     }
-    const content = document.createElement('span');
-    content.textContent = text;
-    div.appendChild(content);
-    chat.appendChild(div);
-    scrollToBottom();
-    return div;
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    if (save) scrollBottom();
+    return wrap;
 }
 
-function addLoadingMessage(text) {
-    const div = document.createElement('div');
-    div.className = 'message ai';
+function renderLoading(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ai';
     const label = document.createElement('span');
-    label.className = 'ai-label';
+    label.className = 'msg-label';
     label.textContent = 'Briefly';
-    const content = document.createElement('span');
-    content.className = 'loading-text loading-dots';
-    content.textContent = text;
-    div.appendChild(label);
-    div.appendChild(content);
-    chat.appendChild(div);
-    scrollToBottom();
-    return div;
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    const span = document.createElement('span');
+    span.className = 'loading-text loading-dots';
+    span.textContent = text;
+    bubble.appendChild(span);
+    wrap.appendChild(label);
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    scrollBottom();
+    return wrap;
 }
 
-function addHandoffCard(handoff) {
+function renderReceipt(handoff, save) {
     const card = document.createElement('div');
-    card.className = 'handoff-card';
+    card.className = 'receipt';
 
-    const header = document.createElement('div');
-    header.className = 'handoff-card-header';
-    const title = document.createElement('span');
-    title.className = 'handoff-card-title';
-    title.textContent = 'Handoff Prompt';
-    const badge = document.createElement('span');
-    badge.className = 'handoff-card-badge';
-    badge.textContent = 'Ready to paste';
-    header.appendChild(title);
-    header.appendChild(badge);
+    const topbar = document.createElement('div');
+    topbar.className = 'receipt-topbar';
+    const left = document.createElement('div');
+    left.className = 'receipt-left';
+    const dot = document.createElement('div');
+    dot.className = 'receipt-dot';
+    const label = document.createElement('span');
+    label.className = 'receipt-label';
+    label.textContent = 'Handoff prompt';
+    left.appendChild(dot);
+    left.appendChild(label);
+    const tag = document.createElement('span');
+    tag.className = 'receipt-tag';
+    tag.textContent = 'Ready to paste';
+    topbar.appendChild(left);
+    topbar.appendChild(tag);
 
     const body = document.createElement('div');
-    body.className = 'handoff-body';
+    body.className = 'receipt-body';
     const pre = document.createElement('pre');
     pre.textContent = handoff;
     body.appendChild(pre);
 
     const footer = document.createElement('div');
-    footer.className = 'handoff-card-footer';
+    footer.className = 'receipt-footer';
     const hint = document.createElement('span');
-    hint.className = 'handoff-hint';
-    hint.textContent = 'Paste this into any AI to continue without re-explaining.';
+    hint.className = 'receipt-footer-hint';
+    hint.textContent = 'Drop this into any AI to continue without re-explaining.';
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
-    copyBtn.className = 'copy-btn';
-    copyBtn.textContent = 'Copy Handoff';
+    copyBtn.className = 'btn-copy';
+    copyBtn.textContent = 'Copy handoff';
     copyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(handoff).then(() => {
-            copyBtn.textContent = 'Copied!';
+            copyBtn.textContent = 'Copied';
             copyBtn.classList.add('copied');
-            setTimeout(() => {
-                copyBtn.textContent = 'Copy Handoff';
-                copyBtn.classList.remove('copied');
-            }, 2000);
+            setTimeout(() => { copyBtn.textContent = 'Copy handoff'; copyBtn.classList.remove('copied'); }, 2000);
         });
     });
     footer.appendChild(hint);
     footer.appendChild(copyBtn);
 
-    card.appendChild(header);
+    card.appendChild(topbar);
     card.appendChild(body);
     card.appendChild(footer);
     chat.appendChild(card);
-    scrollToBottom();
+    if (save) scrollBottom();
+}
+
+// ── Donut + mini bars ─────────────────────────────────────────────────────────
+
+function buildDonut(pct, size = 40) {
+    const r = (size / 2) - 4;
+    const circ = 2 * Math.PI * r;
+    const filled = Math.max(0, Math.min(100, pct));
+    const offset = circ - (filled / 100) * circ;
+    const cx = size / 2, cy = size / 2;
+
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+    <svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle class="donut-track" cx="${cx}" cy="${cy}" r="${r}"/>
+      <circle class="donut-fill"
+        cx="${cx}" cy="${cy}" r="${r}"
+        stroke-dasharray="${circ}" stroke-dashoffset="${circ}"
+        data-offset="${offset}"/>
+      <text x="${cx}" y="${cy + 3.5}" text-anchor="middle"
+        font-size="7.5" font-family="Inter,sans-serif"
+        font-weight="600" fill="#34D399">${filled}%</text>
+    </svg>`;
+
+    requestAnimationFrame(() => {
+        const fill = wrap.querySelector('.donut-fill');
+        if (fill) setTimeout(() => { fill.style.strokeDashoffset = fill.dataset.offset; }, 60);
+    });
+    return wrap;
+}
+
+function buildBarMini(label, value, max, type) {
+    const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+    const display = value > 1000 ? `${(value / 1000).toFixed(1)}k` : String(value);
+    const row = document.createElement('div');
+    row.className = 'bar-mini-row';
+    row.innerHTML = `
+    <span class="bar-mini-label">${label}</span>
+    <div class="bar-mini-track">
+      <div class="bar-mini-fill ${type}" style="width:0%" data-pct="${pct}%"></div>
+    </div>
+    <span class="bar-mini-count">${display}</span>`;
+    requestAnimationFrame(() => {
+        const fill = row.querySelector('.bar-mini-fill');
+        if (fill) setTimeout(() => { fill.style.width = fill.dataset.pct; }, 60);
+    });
+    return row;
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+
+function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const h = Math.floor((Date.now() - d) / 3600000);
+    if (h < 1) return 'just now';
+    if (h < 24) return `${h}h ago`;
+    const days = Math.floor(h / 24);
+    if (days < 7) return `${days}d ago`;
+    return d.toLocaleDateString();
 }
 
 function setLoading(state) {
@@ -405,11 +683,9 @@ function setLoading(state) {
     input.disabled = state;
 }
 
-function scrollToBottom() {
-    chat.scrollTop = chat.scrollHeight;
-}
+function scrollBottom() { chat.scrollTop = chat.scrollHeight; }
 
 input.addEventListener('input', () => {
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 130) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 180) + 'px';
 });

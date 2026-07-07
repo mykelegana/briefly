@@ -3,88 +3,191 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="./docs/images/icon.png">
   <title>Briefly</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://kit.fontawesome.com/a0469f5dee.js" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <div class="layout">
+
+  <!-- ── Session rename modal ── -->
+  <div class="modal-overlay" id="rename-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Rename session</span>
+        <button class="modal-close" id="rename-cancel-x"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="text" class="modal-input" id="rename-input" placeholder="Session name" maxlength="80" />
+      <div class="modal-actions">
+        <button class="modal-btn-ghost" id="rename-cancel">Cancel</button>
+        <button class="modal-btn-primary" id="rename-confirm">Rename</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete confirm modal ── -->
+  <div class="modal-overlay" id="delete-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Delete session</span>
+        <button class="modal-close" id="delete-cancel-x"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="modal-body">This will permanently delete this session and its handoff prompt. This action cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="modal-btn-ghost" id="delete-cancel">Cancel</button>
+        <button class="modal-btn-danger" id="delete-confirm">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="shell">
+
+    <!-- ── Sidebar collapsed rail (visible when rail is hidden) ── -->
+    <div class="rail-collapsed" id="rail-collapsed">
+      <button class="rc-btn" id="rail-collapsed-expand" title="Open sidebar">
+        <i class="fa-solid fa-angles-right"></i>
+      </button>
+      <button class="rc-btn" id="rail-collapsed-new" title="New context">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+      <div class="rc-divider"></div>
+      <button class="rc-btn" id="rail-collapsed-sessions" title="Sessions">
+        <i class="fa-regular fa-comments"></i>
+      </button>
+    </div>
 
     <!-- ── Sidebar ── -->
-    <aside class="sidebar" id="sidebar">
+    <aside class="rail" id="sidebar">
 
-      <div class="sidebar-profile">
-        <div class="profile-avatar">
-          <img src="./logo.png" alt="Briefly"
-            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
-          <span class="avatar-fallback">B</span>
+      <div class="rail-header">
+        <div class="brand">
+          <div class="brand-mark">
+            <img src="./docs/images/logo.png" alt="Briefly" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+            <span class="brand-mark-fallback">B</span>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">Briefly</span>
+            <span class="brand-tagline">AI context brief</span>
+          </div>
         </div>
-        <div class="profile-info">
-          <span class="profile-name">Briefly</span>
-          <span class="profile-sub">Your AI context bridge</span>
+        <button class="rail-close" id="sidebar-toggle" title="Close sidebar">
+          <i class="fa-solid fa-angles-left"></i>
+        </button>
+      </div>
+
+      <!-- New context button -->
+      <div class="rail-new-wrap">
+        <button class="btn-new-context" id="btn-new-context">
+          <i class="fa-solid fa-plus"></i>
+          New context
+        </button>
+      </div>
+
+      <div class="rail-stats">
+        <div class="kpi">
+          <span class="kpi-n" id="stat-sessions">—</span>
+          <span class="kpi-l">Handoffs</span>
+        </div>
+        <div class="kpi-divider"></div>
+        <div class="kpi">
+          <span class="kpi-n" id="stat-saved">—</span>
+          <span class="kpi-l">Tokens saved</span>
         </div>
       </div>
 
-      <div class="sidebar-stats">
-        <div class="stat-card">
-          <span class="stat-value" id="stat-sessions">—</span>
-          <span class="stat-label">Sessions</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-saved">—</span>
-          <span class="stat-label">Tokens saved</span>
-        </div>
+      <div class="rail-section-header">
+        <span>Recent</span>
       </div>
 
-      <div class="sidebar-section-label">Recent Sessions</div>
-
-      <div class="sessions-list" id="sessions-list">
-        <div class="sessions-empty">No sessions yet.<br/>Paste a conversation to start.</div>
-      </div>
+      <nav class="session-nav" id="sessions-list">
+        <div class="session-nav-empty">No sessions yet. Paste a conversation to start.</div>
+      </nav>
 
     </aside>
 
     <!-- ── Main ── -->
-    <div class="main">
+    <div class="workspace">
 
-      <header>
-        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sessions">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </button>
-        <div class="header-brand">
-          <span class="logo-mark">B</span>
-          <div>
-            <h1>Briefly</h1>
-            <p>Paste a capped AI conversation — get a handoff prompt to continue anywhere.</p>
+      <div class="topbar hidden" id="topbar">
+
+        <!-- Session title (shown when a session is active) -->
+        <div class="topbar-session-title" id="topbar-session-title">
+          <span class="topbar-session-name" id="topbar-session-name"></span>
+          <div class="topbar-session-menu-wrap">
+            <button class="topbar-session-menu-btn" id="topbar-session-menu-btn" title="Session options">
+              <i class="fa-solid fa-chevron-down"></i>
+            </button>
+            <div class="topbar-dropdown" id="topbar-dropdown">
+              <button class="topbar-dropdown-item" id="topbar-rename">
+                <i class="fa-regular fa-pen-to-square"></i> Rename
+              </button>
+              <div class="topbar-dropdown-divider"></div>
+              <button class="topbar-dropdown-item danger" id="topbar-delete">
+                <i class="fa-regular fa-trash-can"></i> Delete
+              </button>
+            </div>
           </div>
         </div>
-      </header>
 
-      <main id="chat">
-        <div class="message ai">
-          <span class="ai-label">Briefly</span>
-          <span>Paste your previous AI conversation below and I'll extract the context so you can continue it in any other AI tool without re-explaining everything.</span>
+        <!-- Default brand (shown when no session active) -->
+        <div class="topbar-brand" id="topbar-brand">
+          <span class="topbar-logo">B</span>
+          <span class="topbar-title">Briefly</span>
         </div>
+
+        <div class="topbar-right">
+          <span class="topbar-hint">Paste → Extract → Handoff</span>
+        </div>
+      </div>
+
+      <main class="feed" id="chat">
+
+        <!-- Welcome screen -->
+        <div class="welcome-screen" id="welcome-screen">
+          <div class="welcome-logo">
+            <img src="./docs/images/logo.png" alt="Briefly" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+            <div class="welcome-logo-fallback">B</div>
+          </div>
+          <h1 class="welcome-heading">What conversation can I brief for you?</h1>
+          <p class="welcome-sub">Paste a conversation that hit a limit — I'll extract the context so you can continue anywhere and save tokens.</p>
+          <div class="welcome-steps">
+            <div class="wstep">
+              <span class="wstep-icon"><i class="fa-regular fa-paste"></i></span>
+              <div><strong>Paste</strong> your capped AI conversation</div>
+            </div>
+            <div class="wstep">
+              <span class="wstep-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+              <div><strong>Extract</strong> — Briefly pulls out context, stack, problem, and state</div>
+            </div>
+            <div class="wstep">
+              <span class="wstep-icon"><i class="fa-regular fa-copy"></i></span>
+              <div><strong>Handoff</strong> — copy the prompt and drop into any AI tool</div>
+            </div>
+          </div>
+        </div>
+
       </main>
 
-      <form id="chat-form">
-        <textarea id="input" placeholder="Paste your conversation here..." rows="3"></textarea>
-        <button type="submit" id="send-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-          Send
-        </button>
-      </form>
+      <div class="compose-wrap">
+        <form id="chat-form" class="compose">
+          <textarea
+            id="input"
+            class="compose-input"
+            placeholder="Paste your conversation here..."
+            rows="3"
+          ></textarea>
+          <div class="compose-footer">
+            <span class="compose-hint">Supports any AI conversation — Claude, ChatGPT, Gemini, and more</span>
+            <button type="submit" id="send-btn" class="compose-send">
+              <i class="fa-solid fa-paper-plane"></i>
+              Extract
+            </button>
+          </div>
+        </form>
+      </div>
 
     </div>
   </div>
