@@ -19,3 +19,21 @@ A developer context handoff tool that compresses long AI coding conversations in
 ![JSON](https://img.shields.io/badge/JSON-000000?style=flat&logo=json&logoColor=white)
 
 > As a free-tier AI user and backend developer, I frequently hit AI usage limits while building projects. Switching to another AI meant copying entire conversations just to restore context. While that worked, it also carried thousands of unnecessary tokens, consumed more of my limited AI usage, and often caused the next AI to process information it didn't actually need. I built Briefly to extract only the project context that matters, making it easier to continue coding across AI assistants without carrying the entire conversation.
+
+## Core Features
+
+- **AI Context Extraction** - Extracts the essential project context from long AI coding conversations, including the current state, technical decisions, previous attempts, and next steps.
+- **Developer Handoff Generation** - Generates a structured prompt that allows developers to continue working in another AI assistant without re-explaining their project.
+- **Cross-AI Compatibility** - Works with ChatGPT, Claude, Gemini, and other AI assistants by producing provider-agnostic handoff prompts.
+- **Token Optimization** - Removes unnecessary conversation history to reduce token usage and maximize the available context window.
+- **Session History** - Save and reopen previous project contexts without requiring user authentication.
+- **Anonymous Sessions** - Persist project history using anonymous user IDs, allowing developers to continue where they left off without creating an account.
+
+## Tech Stack
+
+- **Runtime** - Node.js with NestJS framework
+- **Languages** - TypeScript, JavaScript, HTML, CSS
+- **Database** - PostgreSQL with Prisma ORM
+- **Artificial Intelligence** - Gemini API, Groq API
+- **Deployment & Infrastructure** - AWS EC2, AWS RDS, Nginx (Reverse Proxy)
+- **Containerization** - Docker & Docker Compose
