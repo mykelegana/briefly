@@ -25,6 +25,7 @@ A developer context handoff tool that compresses long AI coding conversations in
 - **Cross-AI Compatibility** - Works with ChatGPT, Claude, Gemini, and other AI assistants by producing provider-agnostic handoff prompts.
 - **Token Optimization** - Removes unnecessary conversation history to reduce token usage and maximize the available context window.
 - **Rate Limiting** - Protects AI endpoints with IP-based request throttling to prevent abuse and preserve API quotas.
+- **API Documentation** - Interactive Swagger (OpenAPI) documentation for exploring and testing API endpoints.
 - **Session History** - Save and reopen previous project contexts without requiring user authentication.
 - **Anonymous Sessions** - Persist project history using anonymous user IDs, allowing developers to continue where they left off without creating an account.
 
@@ -34,6 +35,7 @@ A developer context handoff tool that compresses long AI coding conversations in
 - **Languages** - TypeScript, JavaScript, HTML5, CSS3
 - **Database** - PostgreSQL with Prisma ORM
 - **Artificial Intelligence** - Gemini API, Groq API
+- **API Documentation** - Swagger (OpenAPI)
 - **Security** - @nestjs/throttler (Rate Limiting)
 - **Deployment & Infrastructure** - AWS EC2, AWS RDS, Nginx (Reverse Proxy)
 - **Containerization** - Docker & Docker Compose
