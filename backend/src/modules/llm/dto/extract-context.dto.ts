@@ -1,6 +1,8 @@
 import { IsString, IsNotEmpty, MinLength, MaxLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class ExtractContextDto {
+    @ApiProperty({ description: 'The coversation you want to extract.' })
     @IsString()
     @IsNotEmpty({ message: 'Conversation text must not be empty.' })
     @MinLength(50, {
