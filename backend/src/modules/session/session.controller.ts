@@ -15,10 +15,12 @@ import {
 import type { Request, Response } from 'express';
 import { SaveSessionDto } from './dto/save-session.dto';
 import { SessionService } from './session.service';
+import { SkipThrottle } from '@nestjs/throttler';
 
 const TOKEN_HEADER = 'x-session-token';
 
 @Controller('sessions')
+@SkipThrottle()
 export class SessionController {
   private readonly logger = new Logger(SessionController.name);
 

@@ -50,7 +50,7 @@
       <button class="rc-btn" id="rail-collapsed-expand" title="Open sidebar">
         <i class="fa-solid fa-angles-right"></i>
       </button>
-      <button class="rc-btn" id="rail-collapsed-new" title="New context">
+      <button class="rc-btn" id="rail-collapsed-new" title="New Handoff">
         <i class="fa-solid fa-plus"></i>
       </button>
       <div class="rc-divider"></div>
@@ -82,7 +82,7 @@
       <div class="rail-new-wrap">
         <button class="btn-new-context" id="btn-new-context">
           <i class="fa-solid fa-plus"></i>
-          New context
+          New handoff
         </button>
       </div>
 
@@ -103,7 +103,7 @@
       </div>
 
       <nav class="session-nav" id="sessions-list">
-        <div class="session-nav-empty">No sessions yet. Paste a conversation to start.</div>
+        <div class="session-nav-empty">No sessions yet. Generate your first handoff to start building your history.</div>
       </nav>
 
     </aside>
@@ -151,20 +151,20 @@
             <img src="./docs/images/logo.png" alt="Briefly" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
             <div class="welcome-logo-fallback">B</div>
           </div>
-          <h1 class="welcome-heading">What conversation can I brief for you?</h1>
-          <p class="welcome-sub">Paste a conversation that hit a limit — I'll extract the context so you can continue anywhere and save tokens.</p>
+          <h1 class="welcome-heading">Hit your AI limit? Continue without starting over.</h1>
+          <p class="welcome-sub">Paste the AI conversation that reached its limit. Briefly extracts the project context that matters and generates a prompt you can paste into another AI assistant to continue where you left off.</p>
           <div class="welcome-steps">
             <div class="wstep">
               <span class="wstep-icon"><i class="fa-regular fa-paste"></i></span>
-              <div><strong>Paste</strong> your capped AI conversation</div>
+              <div><strong>Paste</strong> the AI conversation that reached its limit.</div>
             </div>
             <div class="wstep">
               <span class="wstep-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
-              <div><strong>Extract</strong> — Briefly pulls out context, stack, problem, and state</div>
+              <div><strong>Extract</strong> — Briefly extracts the project context that matters, including your progress, technical decisions, previous attempts, and next steps.</div>
             </div>
             <div class="wstep">
               <span class="wstep-icon"><i class="fa-regular fa-copy"></i></span>
-              <div><strong>Handoff</strong> — copy the prompt and drop into any AI tool</div>
+              <div><strong>Handoff</strong> — Paste the generated prompt into ChatGPT, Claude, Gemini, or another AI assistant and continue where you left off.</div>
             </div>
           </div>
         </div>
@@ -176,14 +176,14 @@
           <textarea
             id="input"
             class="compose-input"
-            placeholder="Paste your conversation here..."
+            placeholder="Paste your AI conversation here..."
             rows="3"
           ></textarea>
           <div class="compose-footer">
             <span class="compose-hint">Supports any AI conversation — Claude, ChatGPT, Gemini, and more</span>
             <button type="submit" id="send-btn" class="compose-send">
               <i class="fa-solid fa-paper-plane"></i>
-              Extract
+              Generate Handoff
             </button>
           </div>
         </form>
