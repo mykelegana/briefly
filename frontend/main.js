@@ -461,6 +461,11 @@ form.addEventListener('submit', async (e) => {
         });
         extractToken(extractRes);
 
+        if (extractRes.status === 429) {
+            const err = await extractRes.json();
+            throw new Error(err.message ?? 'Too Many Requests wait, try again after 60 seconds')
+        }
+
         if (!extractRes.ok) {
             const err = await extractRes.json();
             throw new Error(err.message ?? 'Extraction failed.');
@@ -476,6 +481,10 @@ form.addEventListener('submit', async (e) => {
             body: JSON.stringify(context),
         });
         extractToken(handoffRes);
+
+        if (handoffRes.status === 429) {
+            throw new Error('Too many requests, please wait 60 seconds.');
+        }
 
         if (!handoffRes.ok) {
             const err = await handoffRes.json();
@@ -499,9 +508,17 @@ form.addEventListener('submit', async (e) => {
             })
             .catch((err) => console.error('saveSession:', err));
 
-    } catch (err) {
+    } catch (err) {                                          // ← HERE
         loading.remove();
-        const msg = `Something went wrong: ${err.message}`;
+
+        const isRateLimit = err.message?.toLowerCase().includes('too many')
+            || err.message?.includes('429')
+            || err.message?.includes('rate');
+
+        const msg = isRateLimit
+            ? 'Rate limit reached. Please wait 60 seconds before trying again.'
+            : `Something went wrong: ${err.message}`;
+
         renderMsg(msg, 'ai', true);
         appendChatHistory({ type: 'ai', text: msg });
         console.error(err);
