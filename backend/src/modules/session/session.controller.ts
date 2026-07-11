@@ -16,6 +16,7 @@ import type { Request, Response } from 'express';
 import { SaveSessionDto } from './dto/save-session.dto';
 import { SessionService } from './session.service';
 import { SkipThrottle } from '@nestjs/throttler';
+import { ApiBody, ApiHeader, ApiParam } from '@nestjs/swagger';
 
 const TOKEN_HEADER = 'x-session-token';
 
@@ -44,6 +45,7 @@ export class SessionController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiBody({ type: SaveSessionDto })
   async saveSession(
     @Body() dto: SaveSessionDto,
     @Req() req: Request,
@@ -54,6 +56,10 @@ export class SessionController {
   }
 
   @Get()
+  @ApiHeader({
+    name: 'x-session-token',
+    required: true,
+  })
   async getSessions(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -63,6 +69,10 @@ export class SessionController {
   }
 
   @Get(':id')
+  @ApiHeader({
+    name: 'x-session-token',
+    required: true,
+  })
   async getSession(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: Request,
@@ -73,6 +83,10 @@ export class SessionController {
   }
 
   @Delete(':id')
+  @ApiHeader({
+    name: 'x-session-token',
+    required: true,
+  })
   @HttpCode(HttpStatus.OK)
   async deleteSession(
     @Param('id', ParseIntPipe) id: number,
