@@ -39,3 +39,265 @@ A developer context handoff tool that compresses long AI coding conversations in
 - **Security** - @nestjs/throttler (Rate Limiting)
 - **Deployment & Infrastructure** - AWS EC2, AWS RDS, Nginx (Reverse Proxy)
 - **Containerization** - Docker & Docker Compose
+
+## Project Setup
+
+```bash
+cd backend/
+npm install
+```
+
+## Environment Configuration
+Create a `.env` file in the `backend/` directory.
+
+```env
+# DATABASE CONFIG
+DATABASE_URL="your_database_url"
+
+# GEMINI
+GEMINI_API_KEY=your-gemini-api-key
+
+# GROQ
+GROQ_API_KEY=your-groq-api-key
+
+# SYSTEM LISTENS TO ?
+PORT=3000
+
+# if you use postgresql add the credentials as:
+POSTGRES_USER=your-user
+POSTGRES_PASSWORD=your-password
+POSTGRES_DB=your-database
+```
+
+## Running the App
+
+### Local Development
+> open with live server the 'index.html' file to see the frontend
+
+```bash
+# development with watch mode
+cd backend/
+npm run start:dev
+
+# debug mode
+cd backend/
+npm run start:debug
+```
+## Production Deployment & Nginx Configuration
+
+## API Endpoints
+can be seen in swagger 'localhost:3000/api'
+
+### Llm
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/extract` | extracts the raw text to a context in JSON format |
+
+### Handoff
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/handoff/generate` | converts the extracted context in a structured prompt |
+
+### Session
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/sessions` | adds a new session after generating the handoff |
+| GET | `/sessions` | displays all the sessions of the anonymous user |
+| GET | `/sessions/{id}` | displays a specific session of the anonymous user |
+| DELETE | `/sessions/{id}` | deletes a specific session of the anonymous user |
+
+## Request/Response Examples
+
+### POST /extract – extracts the raw text to a context in JSON format
+
+**Request Body:**
+```json
+{
+  "text": "your-raw-ai-conversation",
+}
+```
+
+**Response (200):**
+```json
+{
+  "techStack": [
+    "NestJS",
+    "Node.js"
+  ],
+  "projectName": "Briefly",
+  "problem": "The user's NestJS code for interacting with the Google GenAI API has several errors, including incorrect API key handling, wrong SDK method calls, and an invalid model name. The goal is to fix the code to correctly use the Gemini API.",
+  "triedAndFailed": [
+    {
+      "approach": "Using `interactions.create` with `gemini-3.5-flash` and `input` parameter.",
+      "outcome": "Initially suggested as incorrect, then confirmed as correct by the AI after reviewing documentation, but the API key was still an issue."
+    },
+    {
+      "approach": "Using `ai.models.generateContent` with `gemini-2.5-flash` and `contents` parameter.",
+      "outcome": "This was a suggested fix based on a misunderstanding of the SDK version, but the user's original approach was closer to the correct implementation for the specified SDK."
+    }
+  ],
+  "currentState": "The NestJS `LlmService` code has been corrected to properly use the `@google/genai` SDK, specifically the `ai.interactions.create` method with `gemini-3.5-flash`, and to correctly read the API key from environment variables. The AI also clarified why constructor, super, extends, and implements are not strictly necessary for the current implementation but suggested using a constructor with `ConfigService` for a more idiomatic NestJS approach in the future.",
+  "unresolvedQuestions": [],
+  "nextStep": "The user might want to implement error handling for fallback mechanisms (e.g., Groq) and integrate `ConfigService` for API key management.",
+  "conversationSummary": "The user provided NestJS code using the Google GenAI SDK and asked for corrections. The AI initially provided a fix assuming an older SDK version and incorrect model name. After the user pointed to documentation, the AI corrected itself, identifying the primary issue as incorrectly reading the API key from environment variables (missing quotes). The AI also explained the usage of NestJS class decorators like constructor, extends, and implements in the context of the provided service, suggesting a future improvement using `ConfigService` for API key management."
+}
+```
+
+### POST /handoff/generate – converts the extracted context in a structured prompt
+
+**Request Body:**
+```json
+{
+  "techStack": [
+    "NestJS",
+    "Node.js"
+  ],
+  "projectName": "Briefly",
+  "problem": "The user's NestJS code for interacting with the Google GenAI API has several errors, including incorrect API key handling, wrong SDK method calls, and an invalid model name. The goal is to fix the code to correctly use the Gemini API.",
+  "triedAndFailed": [
+    {
+      "approach": "Using `interactions.create` with `gemini-3.5-flash` and `input` parameter.",
+      "outcome": "Initially suggested as incorrect, then confirmed as correct by the AI after reviewing documentation, but the API key was still an issue."
+    },
+    {
+      "approach": "Using `ai.models.generateContent` with `gemini-2.5-flash` and `contents` parameter.",
+      "outcome": "This was a suggested fix based on a misunderstanding of the SDK version, but the user's original approach was closer to the correct implementation for the specified SDK."
+    }
+  ],
+  "currentState": "The NestJS `LlmService` code has been corrected to properly use the `@google/genai` SDK, specifically the `ai.interactions.create` method with `gemini-3.5-flash`, and to correctly read the API key from environment variables. The AI also clarified why constructor, super, extends, and implements are not strictly necessary for the current implementation but suggested using a constructor with `ConfigService` for a more idiomatic NestJS approach in the future.",
+  "unresolvedQuestions": [],
+  "nextStep": "The user might want to implement error handling for fallback mechanisms (e.g., Groq) and integrate `ConfigService` for API key management.",
+  "conversationSummary": "The user provided NestJS code using the Google GenAI SDK and asked for corrections. The AI initially provided a fix assuming an older SDK version and incorrect model name. After the user pointed to documentation, the AI corrected itself, identifying the primary issue as incorrectly reading the API key from environment variables (missing quotes). The AI also explained the usage of NestJS class decorators like constructor, extends, and implements in the context of the provided service, suggesting a future improvement using `ConfigService` for API key management."
+}
+```
+**Response (201):**
+```text
+=== CONTEXT HANDOFF — Briefly ===
+
+The following contains extracted context from a previous AI conversation.
+Treat this as the current state of the project and continue from here.
+
+IMPORTANT INSTRUCTIONS:
+- Only use the information provided below. Do not invent or assume missing
+details.
+- If a field says 'Not provided', ask for clarification before proceeding.
+- Do not restart the project or repeat steps already completed.
+- Do not retry previously failed approaches unless you can explain why a
+variation would differ.
+- Respect existing architecture and technology decisions.
+- Focus on the Next Step and Unresolved Questions first.
+- Provide practical guidance with code examples where helpful.
+
+─────────────────────────────────
+
+PROJECT NAME:
+Briefly
+
+TECH STACK:
+- NestJS
+- Node.js
+
+PROBLEM:
+The user's NestJS code for interacting with the Google GenAI API has several
+errors, including incorrect API key handling, wrong SDK method calls, and an
+invalid model name. The goal is to fix the code to correctly use the Gemini API.
+
+WHAT WAS TRIED (AND FAILED):
+1. Approach: Using `interactions.create` with `gemini-3.5-flash` and `input`
+parameter.
+Outcome: Initially suggested as incorrect, then confirmed as correct by the AI
+after reviewing documentation, but the API key was still an issue.
+2. Approach: Using `ai.models.generateContent` with `gemini-2.5-flash` and
+`contents` parameter.
+Outcome: This was a suggested fix based on a misunderstanding of the SDK
+version, but the user's original approach was closer to the correct
+implementation for the specified SDK.
+
+CURRENT STATE:
+The NestJS `LlmService` code has been corrected to properly use the
+`@google/genai` SDK, specifically the `ai.interactions.create` method with
+`gemini-3.5-flash`, and to correctly read the API key from environment
+variables. The AI also clarified why constructor, super, extends, and implements
+are not strictly necessary for the current implementation but suggested using a
+constructor with `ConfigService` for a more idiomatic NestJS approach in the
+future.
+
+UNRESOLVED QUESTIONS:
+- Not provided
+
+NEXT STEP:
+The user might want to implement error handling for fallback mechanisms (e.g.,
+Groq) and integrate `ConfigService` for API key management.
+
+CONVERSATION SUMMARY:
+The user provided NestJS code using the Google GenAI SDK and asked for
+corrections. The AI initially provided a fix assuming an older SDK version and
+incorrect model name. After the user pointed to documentation, the AI corrected
+itself, identifying the primary issue as incorrectly reading the API key from
+environment variables (missing quotes). The AI also explained the usage of
+NestJS class decorators like constructor, extends, and implements in the context
+of the provided service, suggesting a future improvement using `ConfigService`
+for API key management.
+
+=================================
+Continue from here.
+```
+### Error Responses
+
+**500 Internal Server Error** – Both AI providers failed to extract context.
+```json
+{
+  "statusCode": 500,
+  "message": "Both AI providers failed to extract context. Please try again later."
+}
+```
+
+**429 Too Many Requests** – Rate limit of Briefly:
+```json
+{
+  "statusCode": 429,
+  "message": "Too Many Requests, only 5 attempts for 60 seconds."
+}
+```
+
+**404 Not Found** – Session doesn't exist:
+```json
+{
+  "statusCode": 404,
+  "message": "Session not found."
+}
+```
+
+**400 Bad Request** – Validation error:
+```json
+{
+  "message": [
+    "each value in techStack must be a string"
+  ],
+  "error": "Bad Request",
+  "statusCode": 400
+}
+```
+
+## Data Models
+
+### Anonymous User
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | Text | UUID (Primary key) |
+
+### Sessions
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | Integer | Primary key (auto-increment) |
+| `rawInput` | Text | Raw input text |
+| `context` | JSONB | Context came from /extract |
+| `handoff` | Text | Generated handoff from extract |
+| `createdAt` | Timestamp without timezone | Created timestamp |
+| `anonymousUserId` | Text | Foreign key of anonymous user id |
+
+## Architecture Diagram
+
+## Video Demo

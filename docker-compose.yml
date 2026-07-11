@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend/
     env_file:
-      - ./backend/.env
+      - ./backend/.env.docker
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -18,9 +18,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file:
-      - ./backend/.env
-    expose:
-      - "5432"
+      - ./backend/.env.docker
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

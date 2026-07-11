@@ -1,12 +1,12 @@
-const form = document.querySelector('#chat-form');
-const input = document.querySelector('#input');
-const chat = document.querySelector('#chat');
-const sendBtn = document.querySelector('#send-btn');
-const sidebar = document.querySelector('#sidebar');
-const topbar = document.querySelector('#topbar');
-const sessionsList = document.querySelector('#sessions-list');
-const statSessions = document.querySelector('#stat-sessions');
-const statSaved = document.querySelector('#stat-saved');
+const form = document.querySelector('#chat-form') as HTMLFormElement;
+const input = document.querySelector('#input') as HTMLTextAreaElement;
+const chat = document.querySelector('#chat') as HTMLElement;
+const sendBtn = document.querySelector('#send-btn') as HTMLButtonElement;
+const sidebar = document.querySelector('#sidebar') as HTMLElement;
+const topbar = document.querySelector('#topbar') as HTMLElement;
+const sessionsList = document.querySelector('#sessions-list') as HTMLElement;
+const statSessions = document.querySelector('#stat-sessions') as HTMLElement;
+const statSaved = document.querySelector('#stat-saved') as HTMLElement;
 
 const API = 'http://localhost:3000';
 const EXTRACT_URL = `${API}/extract`;
@@ -16,52 +16,79 @@ const SESSION_URL = `${API}/sessions`;
 const TOKEN_KEY = 'briefly_session_token';
 const CHAT_KEY = 'briefly_chat_history';
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface ChatHistoryEntry {
+    type: 'user' | 'ai' | 'handoff';
+    text: string;
+}
+
+interface SessionContext {
+    problem?: string;
+    conversationSummary?: string;
+    [key: string]: unknown;
+}
+
+interface Session {
+    id: number;
+    context?: SessionContext;
+    handoff?: string;
+    rawInput?: string;
+    createdAt?: string;
+    _name?: string;
+}
+
+interface SaveSessionResponse {
+    id: number;
+    [key: string]: unknown;
+}
+
 // ── Active session state ──────────────────────────────────────────────────────
-let activeSessionId = null;
-let activeSessionName = null;
-let allSessions = [];
+
+let activeSessionId: number | string | null = null;
+let activeSessionName: string | null = null;
+let allSessions: Session[] = [];
 
 // Snapshot of the original welcome screen markup so we can restore it exactly
-// (used by "New context" instead of building a separate/duplicate welcome view).
-const welcomeScreenTemplate = document.querySelector('#welcome-screen').outerHTML;
+const welcomeScreenTemplate = (document.querySelector('#welcome-screen') as HTMLElement).outerHTML;
 
-function showWelcomeScreen() {
+function showWelcomeScreen(): void {
     chat.innerHTML = welcomeScreenTemplate;
 }
 
 // ── Token ─────────────────────────────────────────────────────────────────────
 
-function getToken() {
+function getToken(): string {
     let t = localStorage.getItem(TOKEN_KEY);
     if (!t) { t = crypto.randomUUID(); localStorage.setItem(TOKEN_KEY, t); }
     return t;
 }
 
-function makeHeaders(withBody = false) {
-    const h = { 'x-session-token': getToken() };
+function makeHeaders(withBody = false): Record<string, string> {
+    const h: Record<string, string> = { 'x-session-token': getToken() };
     if (withBody) h['Content-Type'] = 'application/json';
     return h;
 }
 
-function extractToken(res) {
+function extractToken(res: Response): void {
     const t = res.headers.get('x-session-token');
     if (t) localStorage.setItem(TOKEN_KEY, t);
 }
 
 // ── Chat persistence ──────────────────────────────────────────────────────────
 
-function getChatHistory() {
+function getChatHistory(): ChatHistoryEntry[] {
     try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); }
     catch { return []; }
 }
 
-function appendChatHistory(entry) {
+function appendChatHistory(entry: ChatHistoryEntry): void {
     const h = getChatHistory();
     h.push(entry);
     try { localStorage.setItem(CHAT_KEY, JSON.stringify(h)); } catch { }
 }
 
-function restoreChat() {
+function restoreChat(): void {
     const history = getChatHistory();
     if (!history.length) return;
     chat.innerHTML = '';
@@ -75,32 +102,30 @@ function restoreChat() {
 
 // ── Sidebar collapse / expand ─────────────────────────────────────────────────
 
-const railCollapsed = document.querySelector('#rail-collapsed');
+const railCollapsed = document.querySelector('#rail-collapsed') as HTMLElement;
 
-function closeSidebar() {
+function closeSidebar(): void {
     sidebar.classList.add('hidden');
     railCollapsed.classList.add('visible');
 }
 
-function openSidebar() {
+function openSidebar(): void {
     sidebar.classList.remove('hidden');
     railCollapsed.classList.remove('visible');
 }
 
-document.querySelector('#sidebar-toggle').addEventListener('click', closeSidebar);
-document.querySelector('#rail-collapsed-expand').addEventListener('click', openSidebar);
-document.querySelector('#rail-collapsed-sessions').addEventListener('click', openSidebar);
-document.querySelector('#rail-collapsed-new').addEventListener('click', () => {
-    document.querySelector('#btn-new-context').click();
+(document.querySelector('#sidebar-toggle') as HTMLElement).addEventListener('click', closeSidebar);
+(document.querySelector('#rail-collapsed-expand') as HTMLElement).addEventListener('click', openSidebar);
+(document.querySelector('#rail-collapsed-sessions') as HTMLElement).addEventListener('click', openSidebar);
+(document.querySelector('#rail-collapsed-new') as HTMLElement).addEventListener('click', () => {
+    (document.querySelector('#btn-new-context') as HTMLElement).click();
 });
 
 // ── New context ───────────────────────────────────────────────────────────────
 
-document.querySelector('#btn-new-context').addEventListener('click', () => {
-    // Clear chat and history — start fresh
+(document.querySelector('#btn-new-context') as HTMLElement).addEventListener('click', () => {
     try { localStorage.removeItem(CHAT_KEY); } catch { }
     setActiveSession(null, null);
-    // Restore the original welcome screen (same one shown on first load)
     showWelcomeScreen();
     document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
     input.focus();
@@ -108,13 +133,13 @@ document.querySelector('#btn-new-context').addEventListener('click', () => {
 
 // ── Topbar session title ──────────────────────────────────────────────────────
 
-const topbarBrand = document.querySelector('#topbar-brand');
-const topbarSessionTitle = document.querySelector('#topbar-session-title');
-const topbarSessionName = document.querySelector('#topbar-session-name');
-const topbarDropdown = document.querySelector('#topbar-dropdown');
-const topbarMenuBtn = document.querySelector('#topbar-session-menu-btn');
+const topbarBrand = document.querySelector('#topbar-brand') as HTMLElement;
+const topbarSessionTitle = document.querySelector('#topbar-session-title') as HTMLElement;
+const topbarSessionName = document.querySelector('#topbar-session-name') as HTMLElement;
+const topbarDropdown = document.querySelector('#topbar-dropdown') as HTMLElement;
+const topbarMenuBtn = document.querySelector('#topbar-session-menu-btn') as HTMLElement;
 
-function setActiveSession(id, name) {
+function setActiveSession(id: number | string | null, name: string | null): void {
     activeSessionId = id;
     activeSessionName = name;
 
@@ -131,42 +156,42 @@ function setActiveSession(id, name) {
     }
 }
 
-topbarMenuBtn.addEventListener('click', (e) => {
+topbarMenuBtn.addEventListener('click', (e: MouseEvent) => {
     e.stopPropagation();
     topbarDropdown.classList.toggle('open');
 });
 
-document.querySelector('#topbar-rename').addEventListener('click', () => {
+(document.querySelector('#topbar-rename') as HTMLElement).addEventListener('click', () => {
     topbarDropdown.classList.remove('open');
     if (activeSessionId) openRenameModal(activeSessionId, activeSessionName);
 });
 
-document.querySelector('#topbar-delete').addEventListener('click', () => {
+(document.querySelector('#topbar-delete') as HTMLElement).addEventListener('click', () => {
     topbarDropdown.classList.remove('open');
     if (activeSessionId) openDeleteModal(activeSessionId);
 });
 
 // ── Rename modal ──────────────────────────────────────────────────────────────
 
-const renameOverlay = document.querySelector('#rename-overlay');
-const renameInput = document.querySelector('#rename-input');
-const renameConfirm = document.querySelector('#rename-confirm');
-let renamingId = null;
+const renameOverlay = document.querySelector('#rename-overlay') as HTMLElement;
+const renameInput = document.querySelector('#rename-input') as HTMLInputElement;
+const renameConfirm = document.querySelector('#rename-confirm') as HTMLElement;
+let renamingId: number | string | null = null;
 
-function openRenameModal(id, currentName) {
+function openRenameModal(id: number | string, currentName: string | null): void {
     renamingId = id;
     renameInput.value = currentName || '';
     renameOverlay.classList.add('open');
     setTimeout(() => { renameInput.focus(); renameInput.select(); }, 50);
 }
 
-function closeRenameModal() {
+function closeRenameModal(): void {
     renameOverlay.classList.remove('open');
     renamingId = null;
 }
 
-document.querySelector('#rename-cancel').addEventListener('click', closeRenameModal);
-document.querySelector('#rename-cancel-x').addEventListener('click', closeRenameModal);
+(document.querySelector('#rename-cancel') as HTMLElement).addEventListener('click', closeRenameModal);
+(document.querySelector('#rename-cancel-x') as HTMLElement).addEventListener('click', closeRenameModal);
 
 renameConfirm.addEventListener('click', async () => {
     const newName = renameInput.value.trim();
@@ -175,13 +200,12 @@ renameConfirm.addEventListener('click', async () => {
     closeRenameModal();
 });
 
-renameInput.addEventListener('keydown', (e) => {
+renameInput.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Enter') renameConfirm.click();
     if (e.key === 'Escape') closeRenameModal();
 });
 
-async function doRenameSession(id, newName) {
-    // Optimistic UI update
+async function doRenameSession(id: number | string, newName: string): Promise<void> {
     const row = document.querySelector(`.session-row[data-id="${id}"]`);
     if (row) {
         const titleEl = row.querySelector('.session-row-title');
@@ -191,33 +215,30 @@ async function doRenameSession(id, newName) {
         activeSessionName = newName;
         topbarSessionName.textContent = newName;
     }
-    // Update in allSessions
     const s = allSessions.find(s => String(s.id) === String(id));
     if (s) s._name = newName;
 
-    // NOTE: backend rename endpoint not yet implemented — update locally only
-    // When backend supports PATCH /sessions/:id, call it here
     console.log('Renamed session', id, 'to', newName);
 }
 
 // ── Delete modal ──────────────────────────────────────────────────────────────
 
-const deleteOverlay = document.querySelector('#delete-overlay');
-const deleteConfirm = document.querySelector('#delete-confirm');
-let deletingId = null;
+const deleteOverlay = document.querySelector('#delete-overlay') as HTMLElement;
+const deleteConfirm = document.querySelector('#delete-confirm') as HTMLElement;
+let deletingId: number | string | null = null;
 
-function openDeleteModal(id) {
+function openDeleteModal(id: number | string): void {
     deletingId = id;
     deleteOverlay.classList.add('open');
 }
 
-function closeDeleteModal() {
+function closeDeleteModal(): void {
     deleteOverlay.classList.remove('open');
     deletingId = null;
 }
 
-document.querySelector('#delete-cancel').addEventListener('click', closeDeleteModal);
-document.querySelector('#delete-cancel-x').addEventListener('click', closeDeleteModal);
+(document.querySelector('#delete-cancel') as HTMLElement).addEventListener('click', closeDeleteModal);
+(document.querySelector('#delete-cancel-x') as HTMLElement).addEventListener('click', closeDeleteModal);
 
 deleteConfirm.addEventListener('click', async () => {
     if (!deletingId) return;
@@ -225,7 +246,7 @@ deleteConfirm.addEventListener('click', async () => {
     closeDeleteModal();
 });
 
-async function doDeleteSession(id) {
+async function doDeleteSession(id: number | string): Promise<void> {
     try {
         const res = await fetch(`${SESSION_URL}/${id}`, {
             method: 'DELETE',
@@ -236,33 +257,27 @@ async function doDeleteSession(id) {
         console.warn('Delete failed:', err);
     }
 
-    // Remove row from sidebar
     const row = document.querySelector(`.session-row[data-id="${id}"]`);
     if (row) row.remove();
 
-    // If deleted session was active, go back to blank state
     if (activeSessionId === String(id) || activeSessionId === id) {
         try { localStorage.removeItem(CHAT_KEY); } catch { }
         setActiveSession(null, null);
         showWelcomeScreen();
     }
 
-    // Reload sessions to update stats
     loadSessions();
 }
 
 // ── Close dropdowns when clicking outside ─────────────────────────────────────
 
-document.addEventListener('click', (e) => {
-    // Close topbar dropdown
-    if (!topbarMenuBtn.contains(e.target) && !topbarDropdown.contains(e.target)) {
+document.addEventListener('click', (e: MouseEvent) => {
+    if (!topbarMenuBtn.contains(e.target as Node) && !topbarDropdown.contains(e.target as Node)) {
         topbarDropdown.classList.remove('open');
     }
-    // Close any open session row dropdowns
     document.querySelectorAll('.session-row-dropdown.open').forEach(dd => {
         dd.classList.remove('open');
     });
-    // Close modals on overlay click
     if (e.target === renameOverlay) closeRenameModal();
     if (e.target === deleteOverlay) closeDeleteModal();
 });
@@ -274,12 +289,12 @@ loadSessions();
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
-async function loadSessions() {
+async function loadSessions(): Promise<void> {
     try {
         const res = await fetch(SESSION_URL, { headers: makeHeaders() });
         extractToken(res);
         if (!res.ok) return;
-        const sessions = await res.json();
+        const sessions: Session[] = await res.json();
         allSessions = sessions;
         renderSessions(sessions);
     } catch (err) {
@@ -287,7 +302,7 @@ async function loadSessions() {
     }
 }
 
-function renderSessions(sessions) {
+function renderSessions(sessions: Session[]): void {
     if (!sessions?.length) {
         sessionsList.innerHTML = '<div class="session-nav-empty">No sessions yet. Paste a conversation to start.</div>';
         statSessions.textContent = '0';
@@ -295,7 +310,7 @@ function renderSessions(sessions) {
         return;
     }
 
-    statSessions.textContent = sessions.length;
+    statSessions.textContent = String(sessions.length);
     sessionsList.innerHTML = '';
 
     let totalIn = 0, totalOut = 0;
@@ -311,7 +326,6 @@ function renderSessions(sessions) {
         totalOut += outT;
         const pct = inT > 0 ? Math.max(0, Math.round((1 - outT / inT) * 100)) : 0;
         const row = buildRow(s.id, problem, date, inT, outT, pct);
-        // Re-apply active state if this was the active session
         if (String(s.id) === String(activeSessionId)) row.classList.add('active');
         sessionsList.appendChild(row);
     });
@@ -320,23 +334,28 @@ function renderSessions(sessions) {
     statSaved.textContent = saved > 1000 ? `${(saved / 1000).toFixed(1)}k` : String(saved);
 }
 
-function buildRow(id, problem, date, inT, outT, pct) {
+function buildRow(
+    id: number,
+    problem: string,
+    date: string,
+    inT: number,
+    outT: number,
+    pct: number
+): HTMLElement {
     const row = document.createElement('div');
     row.className = 'session-row';
-    row.dataset.id = id;
+    row.dataset.id = String(id);
 
-    // Click body to load session
-    row.addEventListener('click', (e) => {
-        if (e.target.closest('.session-row-ellipsis') || e.target.closest('.session-row-dropdown')) return;
+    row.addEventListener('click', (e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest('.session-row-ellipsis') ||
+            (e.target as HTMLElement).closest('.session-row-dropdown')) return;
         loadSession(id, row, problem);
     });
 
-    // Donut
     const donutWrap = document.createElement('div');
     donutWrap.className = 'session-row-donut';
     donutWrap.appendChild(buildDonut(pct, 34));
 
-    // Body
     const body = document.createElement('div');
     body.className = 'session-row-body';
 
@@ -367,13 +386,11 @@ function buildRow(id, problem, date, inT, outT, pct) {
     body.appendChild(meta);
     body.appendChild(bars);
 
-    // Ellipsis button
     const ellipsis = document.createElement('button');
     ellipsis.className = 'session-row-ellipsis';
     ellipsis.title = 'Session options';
     ellipsis.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
 
-    // Row dropdown
     const dropdown = document.createElement('div');
     dropdown.className = 'session-row-dropdown';
     dropdown.innerHTML = `
@@ -385,16 +402,15 @@ function buildRow(id, problem, date, inT, outT, pct) {
       <i class="fa-regular fa-trash-can"></i> Delete
     </button>`;
 
-    ellipsis.addEventListener('click', (e) => {
+    ellipsis.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation();
-        // Close all other dropdowns first
         document.querySelectorAll('.session-row-dropdown.open').forEach(dd => dd.classList.remove('open'));
         dropdown.classList.toggle('open');
     });
 
-    dropdown.addEventListener('click', (e) => {
+    dropdown.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation();
-        const action = e.target.closest('[data-action]')?.dataset.action;
+        const action = (e.target as HTMLElement).closest('[data-action]')?.getAttribute('data-action');
         if (action === 'rename') {
             dropdown.classList.remove('open');
             openRenameModal(id, title.textContent);
@@ -411,7 +427,7 @@ function buildRow(id, problem, date, inT, outT, pct) {
     return row;
 }
 
-async function loadSession(id, rowEl, name) {
+async function loadSession(id: number | string, rowEl: HTMLElement, name: string): Promise<void> {
     document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
     rowEl.classList.add('active');
     setActiveSession(id, name);
@@ -420,7 +436,7 @@ async function loadSession(id, rowEl, name) {
         const res = await fetch(`${SESSION_URL}/${id}`, { headers: makeHeaders() });
         extractToken(res);
         if (!res.ok) return;
-        const session = await res.json();
+        const session: Session = await res.json();
 
         chat.innerHTML = '';
         if (session.rawInput) renderMsg(session.rawInput, 'user', false);
@@ -433,7 +449,7 @@ async function loadSession(id, rowEl, name) {
 
 // ── Submit ────────────────────────────────────────────────────────────────────
 
-form.addEventListener('submit', async (e) => {
+form.addEventListener('submit', async (e: SubmitEvent) => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
@@ -441,7 +457,6 @@ form.addEventListener('submit', async (e) => {
     document.querySelectorAll('.session-row').forEach(el => el.classList.remove('active'));
     setActiveSession(null, null);
 
-    // Remove the welcome screen once a conversation starts
     if (chat.querySelector('#welcome-screen')) chat.innerHTML = '';
 
     renderMsg(text, 'user', true);
@@ -463,7 +478,7 @@ form.addEventListener('submit', async (e) => {
 
         if (extractRes.status === 429) {
             const err = await extractRes.json();
-            throw new Error(err.message ?? 'Too Many Requests wait, try again after 60 seconds')
+            throw new Error(err.message ?? 'Too Many Requests wait, try again after 60 seconds');
         }
 
         if (!extractRes.ok) {
@@ -471,7 +486,7 @@ form.addEventListener('submit', async (e) => {
             throw new Error(err.message ?? 'Extraction failed.');
         }
 
-        const context = await extractRes.json();
+        const context: SessionContext = await extractRes.json();
         const lt = loading.querySelector('.loading-text');
         if (lt) lt.textContent = 'Generating handoff';
 
@@ -500,7 +515,6 @@ form.addEventListener('submit', async (e) => {
 
         saveSession(text, context, handoff)
             .then((saved) => {
-                // Auto-set topbar to new session name
                 const ctx = context ?? {};
                 const name = ctx.problem || ctx.conversationSummary || 'New session';
                 setActiveSession(saved?.id, name);
@@ -508,16 +522,16 @@ form.addEventListener('submit', async (e) => {
             })
             .catch((err) => console.error('saveSession:', err));
 
-    } catch (err) {                                          // ← HERE
+    } catch (err) {
         loading.remove();
 
-        const isRateLimit = err.message?.toLowerCase().includes('too many')
-            || err.message?.includes('429')
-            || err.message?.includes('rate');
+        const isRateLimit = (err as Error).message?.toLowerCase().includes('too many')
+            || (err as Error).message?.includes('429')
+            || (err as Error).message?.includes('rate');
 
         const msg = isRateLimit
             ? 'Rate limit reached. Please wait 60 seconds before trying again.'
-            : `Something went wrong: ${err.message}`;
+            : `Something went wrong: ${(err as Error).message}`;
 
         renderMsg(msg, 'ai', true);
         appendChatHistory({ type: 'ai', text: msg });
@@ -529,7 +543,11 @@ form.addEventListener('submit', async (e) => {
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 
-async function saveSession(rawInput, context, handoffOutput) {
+async function saveSession(
+    rawInput: string,
+    context: SessionContext,
+    handoffOutput: string
+): Promise<SaveSessionResponse> {
     const res = await fetch(SESSION_URL, {
         method: 'POST',
         headers: makeHeaders(true),
@@ -545,7 +563,7 @@ async function saveSession(rawInput, context, handoffOutput) {
 
 // ── Render helpers ────────────────────────────────────────────────────────────
 
-function renderMsg(text, type, save) {
+function renderMsg(text: string, type: 'user' | 'ai', save: boolean): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = `msg ${type}`;
     if (type === 'ai') {
@@ -563,7 +581,7 @@ function renderMsg(text, type, save) {
     return wrap;
 }
 
-function renderLoading(text) {
+function renderLoading(text: string): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'msg ai';
     const label = document.createElement('span');
@@ -582,12 +600,12 @@ function renderLoading(text) {
     return wrap;
 }
 
-function renderReceipt(handoff, save) {
+function renderReceipt(handoff: string, save: boolean): void {
     const card = document.createElement('div');
     card.className = 'receipt';
 
-    const topbar = document.createElement('div');
-    topbar.className = 'receipt-topbar';
+    const topbarEl = document.createElement('div');
+    topbarEl.className = 'receipt-topbar';
     const left = document.createElement('div');
     left.className = 'receipt-left';
     const dot = document.createElement('div');
@@ -600,8 +618,8 @@ function renderReceipt(handoff, save) {
     const tag = document.createElement('span');
     tag.className = 'receipt-tag';
     tag.textContent = 'Ready to paste';
-    topbar.appendChild(left);
-    topbar.appendChild(tag);
+    topbarEl.appendChild(left);
+    topbarEl.appendChild(tag);
 
     const body = document.createElement('div');
     body.className = 'receipt-body';
@@ -628,7 +646,7 @@ function renderReceipt(handoff, save) {
     footer.appendChild(hint);
     footer.appendChild(copyBtn);
 
-    card.appendChild(topbar);
+    card.appendChild(topbarEl);
     card.appendChild(body);
     card.appendChild(footer);
     chat.appendChild(card);
@@ -637,7 +655,7 @@ function renderReceipt(handoff, save) {
 
 // ── Donut + mini bars ─────────────────────────────────────────────────────────
 
-function buildDonut(pct, size = 40) {
+function buildDonut(pct: number, size = 40): HTMLElement {
     const r = (size / 2) - 4;
     const circ = 2 * Math.PI * r;
     const filled = Math.max(0, Math.min(100, pct));
@@ -658,13 +676,13 @@ function buildDonut(pct, size = 40) {
     </svg>`;
 
     requestAnimationFrame(() => {
-        const fill = wrap.querySelector('.donut-fill');
-        if (fill) setTimeout(() => { fill.style.strokeDashoffset = fill.dataset.offset; }, 60);
+        const fill = wrap.querySelector('.donut-fill') as SVGCircleElement | null;
+        if (fill) setTimeout(() => { fill.style.strokeDashoffset = (fill as HTMLElement).dataset.offset!; }, 60);
     });
     return wrap;
 }
 
-function buildBarMini(label, value, max, type) {
+function buildBarMini(label: string, value: number, max: number, type: 'in' | 'out'): HTMLElement {
     const pct = max > 0 ? Math.round((value / max) * 100) : 0;
     const display = value > 1000 ? `${(value / 1000).toFixed(1)}k` : String(value);
     const row = document.createElement('div');
@@ -676,18 +694,18 @@ function buildBarMini(label, value, max, type) {
     </div>
     <span class="bar-mini-count">${display}</span>`;
     requestAnimationFrame(() => {
-        const fill = row.querySelector('.bar-mini-fill');
-        if (fill) setTimeout(() => { fill.style.width = fill.dataset.pct; }, 60);
+        const fill = row.querySelector('.bar-mini-fill') as HTMLElement | null;
+        if (fill) setTimeout(() => { fill.style.width = fill.dataset.pct!; }, 60);
     });
     return row;
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 
-function fmtDate(iso) {
+function fmtDate(iso: string | undefined): string {
     if (!iso) return '';
     const d = new Date(iso);
-    const h = Math.floor((Date.now() - d) / 3600000);
+    const h = Math.floor((Date.now() - d.getTime()) / 3600000);
     if (h < 1) return 'just now';
     if (h < 24) return `${h}h ago`;
     const days = Math.floor(h / 24);
@@ -695,12 +713,12 @@ function fmtDate(iso) {
     return d.toLocaleDateString();
 }
 
-function setLoading(state) {
+function setLoading(state: boolean): void {
     sendBtn.disabled = state;
     input.disabled = state;
 }
 
-function scrollBottom() { chat.scrollTop = chat.scrollHeight; }
+function scrollBottom(): void { chat.scrollTop = chat.scrollHeight; }
 
 input.addEventListener('input', () => {
     input.style.height = 'auto';
