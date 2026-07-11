@@ -71,7 +71,9 @@ POSTGRES_DB=your-database
 
 ## Running the App
 
-### Local Development (open with liver server the 'index.html' file to see the frontend)
+### Local Development
+> open with live server the 'index.html' file to see the frontend
+
 ```bash
 # development with watch mode
 cd backend/
