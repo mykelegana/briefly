@@ -171,7 +171,7 @@ can be seen in swagger 'localhost:3000/api'
 }
 ```
 **Response (201):**
-```json
+```text
 === CONTEXT HANDOFF — Briefly ===
 
 The following contains extracted context from a previous AI conversation.
