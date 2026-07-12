@@ -43,7 +43,10 @@ A developer context handoff tool that compresses long AI coding conversations in
 ## Project Setup
 
 ```bash
-cd backend/
+cd backend/      # Install backend dependencies
+npm install
+
+cd frontend/     # Install frontend dependencies
 npm install
 ```
 
@@ -72,16 +75,26 @@ POSTGRES_DB=your-database
 ## Running the App
 
 ### Local Development
-> open with live server the 'index.html' file to see the frontend
 
 ```bash
 # development with watch mode
+docker compose up --build db pgadmin     # runs the database and the postgres gui
+
 cd backend/
 npm run start:dev
+
+cd frontend/
+npm run dev
 
 # debug mode
 cd backend/
 npm run start:debug
+
+# Run app through docker
+docker compose up -d --build
+
+cd frontend/
+npm run dev
 ```
 ## Production Deployment & Nginx Configuration
 
