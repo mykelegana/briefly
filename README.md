@@ -311,6 +311,14 @@ Continue from here.
 | `createdAt` | Timestamp without timezone | Created timestamp |
 | `anonymousUserId` | Text | Foreign key of anonymous user id |
 
+## API Documentation (Swagger)
+This project uses Swagger for interactive API documentation, allowing you to explore and test all endpoints directly from your browser.
+
+Once the application is running, access the interactive Swagger UI at:
+```http://localhost:3000/api```
+
+![API Docs](docs/images/api-docs.png)
+
 ## Architecture Diagram
 
 ## Video Demo
