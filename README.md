@@ -321,4 +321,6 @@ Once the application is running, access the interactive Swagger UI at:
 
 ## Architecture Diagram
 
+![Architecture Diagram](docs/images/architecture-diagram.png)
+
 ## Video Demo
