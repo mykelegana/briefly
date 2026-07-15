@@ -18,6 +18,19 @@ A developer context handoff tool that compresses long AI coding conversations in
 
 > As a free-tier AI user and backend developer, I frequently hit AI usage limits while building projects. Switching to another AI meant copying entire conversations just to restore context. While that worked, it also carried thousands of unnecessary tokens, consumed more of my limited AI usage, and often caused the next AI to process information it didn't actually need. I built Briefly to extract only the project context that matters, making it easier to continue coding across AI assistants without carrying the entire conversation.
 
+## Table of Contents
+- [Core Features](#core-features)
+- [Tech Stack](#tech-stack)
+- [Project Setup](#project-setup)
+- [Environment Configuration](#environment-configuration)
+- [Running the App](#running-the-app)
+- [Production Deployment & Nginx](#production-deployment--nginx-configuration)
+- [API Endpoints](#api-endpoints)
+- [Data Models](#data-models)
+- [Swagger API Docs](#api-documentation-swagger)
+- [Architecture Diagram](#architecture-diagram)
+- [Video Demo](#video-demo)
+
 ## Core Features
 
 - **AI Context Extraction** - Extracts the essential project context from long AI coding conversations, including the current state, technical decisions, previous attempts, and next steps.
@@ -50,6 +63,8 @@ cd frontend/     # Install frontend dependencies
 npm install
 ```
 
+[Back to Top](#table-of-contents)
+
 ## Environment Configuration
 Create a `.env` file in the `backend/` directory.
 
@@ -71,6 +86,7 @@ POSTGRES_USER=your-user
 POSTGRES_PASSWORD=your-password
 POSTGRES_DB=your-database
 ```
+[Back to Top](#table-of-contents)
 
 ## Running the App
 
@@ -96,7 +112,63 @@ docker compose up -d --build
 cd frontend/
 npm run dev
 ```
+
+[Back to Top](#table-of-contents)
+
 ## Production Deployment & Nginx Configuration
+
+```bash
+git clone https://github.com/Mykeleganerz/briefly.git       # clone the repo
+
+nano .env.docker                                            # create a .env.docker file
+
+cd frontend                                                 # build the frontend
+npm install
+npm run build
+
+cd backend                                                  # build the backend
+docker compose up -d --build                                
+
+```
+
+The API is deployed on an AWS EC2 instance. Traffic entering through port 80 (HTTP) or 443 (HTTPS) is handled by Nginx, which acts as a reverse proxy, forwarding requests securely to the frontend and NestJS application running on port 3000.
+```bash
+sudo nano etc/nginx/sites-available/briefly                 # edit the nginx and put whats below
+```
+
+```nginx
+server {
+    listen 80;
+    server_name <your_domain_or_ec2_ip>;
+
+    # Serve frontend static files
+    location / {
+        root /home/ubuntu/briefly/frontend/dist;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy backend calls to NestJS
+    location /backend/ {
+        proxy_pass http://localhost:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+To save:
+
+```bash
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+[Back to Top](#table-of-contents)
 
 ## API Endpoints
 can be seen in swagger 'localhost:3000/api'
@@ -120,6 +192,8 @@ can be seen in swagger 'localhost:3000/api'
 | GET | `/sessions` | displays all the sessions of the anonymous user |
 | GET | `/sessions/{id}` | displays a specific session of the anonymous user |
 | DELETE | `/sessions/{id}` | deletes a specific session of the anonymous user |
+
+[Back to Top](#table-of-contents)
 
 ## Request/Response Examples
 
@@ -294,6 +368,8 @@ Continue from here.
 }
 ```
 
+[Back to Top](#table-of-contents)
+
 ## Data Models
 
 ### Anonymous User
@@ -311,6 +387,8 @@ Continue from here.
 | `createdAt` | Timestamp without timezone | Created timestamp |
 | `anonymousUserId` | Text | Foreign key of anonymous user id |
 
+[Back to Top](#table-of-contents)
+
 ## API Documentation (Swagger)
 This project uses Swagger for interactive API documentation, allowing you to explore and test all endpoints directly from your browser.
 
@@ -321,4 +399,10 @@ Once the application is running, access the interactive Swagger UI at:
 
 ## Architecture Diagram
 
+![Architecture Diagram](docs/images/architecture-diagram.png)
+
 ## Video Demo
+
+[![Watch the demo](https://img.youtube.com/vi/c4adQFbKMP4/maxresdefault.jpg)](https://youtu.be/c4adQFbKMP4)
+
+[Back to Top](#table-of-contents)
