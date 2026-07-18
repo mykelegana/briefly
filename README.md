@@ -45,7 +45,7 @@ A developer context handoff tool that compresses long AI coding conversations in
 ## Tech Stack
 
 - **Runtime** - Node.js with NestJS framework
-- **Languages** - TypeScript, JavaScript, HTML5, CSS3
+- **Languages** - TypeScript, HTML5, CSS3
 - **Database** - PostgreSQL with Prisma ORM
 - **Artificial Intelligence** - Gemini API, Groq API
 - **API Documentation** - Swagger (OpenAPI)
